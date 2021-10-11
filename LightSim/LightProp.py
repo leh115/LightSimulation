@@ -9,8 +9,8 @@ import scipy.fftpack as sfft
 ROOTDIR = "C:/Users/Unimatrix Zero/Documents/Uni Masters/Project/"
 class LightSim():
     def __init__(self):
-        self.xDim = 200
-        self.yDim = 200
+        self.xDim = 400
+        self.yDim = 400
         self.RealSpaceFactor = 2e-3
         self.Movie_Frames = np.zeros((100,self.xDim,self.yDim))
         self.Movie_count = 0
@@ -26,14 +26,16 @@ class LightSim():
         ky[np.isinf(ky)] = 0
         print(kx.shape)
 
-        self.k = np.add(kx,ky)
-        self.bowl = np.add(kx**2, ky**2)
-        #cv2.imshow("K",self.k)
+        
 
         g0,g1 = np.meshgrid(x,y)
         self.bowl = np.add(np.multiply(g0,g0), np.multiply(g1,g1))
-        cv2.imshow("bowl",self.bowl/(self.RealSpaceFactor*50)) # show the bowl (s1**2 + s2**2)
-        cv2.waitKey(0)
+        
+        self.k = np.add(g0,g1)
+        #cv2.imshow("K",self.k)
+
+        #cv2.imshow("bowl",self.bowl/(self.RealSpaceFactor*50)) # show the bowl (s1**2 + s2**2)
+        #cv2.waitKey(0)
         #fig = plt.figure()
         #ax = fig.add_subplot(111, projection='3d')
         #ax.scatter(g0, g1, self.bowl,c=data, marker="o")
@@ -45,7 +47,7 @@ class LightSim():
         X = self.gaussian2d(x,0,0.01,showResults=False)
         cv2.imshow("Gaussian",X)
 
-        X = self.PropagateFreeSpace(1e-4,1e-2,X,showResults=True,saveResults=True)
+        X = self.PropagateFreeSpace(1e-1,10,X,showResults=True,saveResults=True)
         #X = Grating*X
         #X = self.PropagateFreeSpace(1e-4,1e-2,X,showResults=True,saveResults=True)
         
@@ -74,7 +76,7 @@ class LightSim():
             # The fourier transform to get to k-space
             #F = np.fft.fft2(X)
             F = sfft.fft2(X)
-            F = sfft.fftshift(F)
+            #F = sfft.fftshift(F)
             # Applying the propagation multiplication to the fourier space
             exponentF = -1j*self.k*d + 1j*np.pi*self.wavelength*d*self.bowl
         
