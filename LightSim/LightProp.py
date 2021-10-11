@@ -9,8 +9,8 @@ import scipy.fftpack as sfft
 ROOTDIR = "C:/Users/Unimatrix Zero/Documents/Uni Masters/Project/"
 class LightSim():
     def __init__(self):
-        self.xDim = 300
-        self.yDim = 300
+        self.xDim = 200
+        self.yDim = 200
         self.RealSpaceFactor = 2e-3
         self.Movie_Frames = np.zeros((100,self.xDim,self.yDim))
         self.Movie_count = 0
@@ -21,31 +21,33 @@ class LightSim():
         y = y*self.RealSpaceFactor
         
         kx,ky = np.divide(2* np.pi, np.meshgrid(x,y) )
-        print(x[0:100:5])
-        #kx = 2*np.pi/x
-        #ky = 2*np.pi/y
+
         kx[np.isinf(kx)] = 0
         ky[np.isinf(ky)] = 0
-        #kx = np.reshape(kx,(self.xDim,1))
-        #ky = np.reshape(ky,(1,self.yDim))
-        #kxx,kyy = np.meshgrid(kx,ky)
-        #self.k = np.add(kxx,kyy)
+        print(kx.shape)
+
         self.k = np.add(kx,ky)
         self.bowl = np.add(kx**2, ky**2)
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-        plt.scatter(kx[0:len(kx):100],ky[0:len(kx):100],kx[0:len(kx):100]**2+ky[0:len(kx):100]**2,marker=".")
-        plt.show()
+        #cv2.imshow("K",self.k)
 
+        g0,g1 = np.meshgrid(x,y)
+        self.bowl = np.add(np.multiply(g0,g0), np.multiply(g1,g1))
+        cv2.imshow("bowl",self.bowl/(self.RealSpaceFactor*50)) # show the bowl (s1**2 + s2**2)
+        cv2.waitKey(0)
+        #fig = plt.figure()
+        #ax = fig.add_subplot(111, projection='3d')
+        #ax.scatter(g0, g1, self.bowl,c=data, marker="o")
+        #plt.show()
 
-        Grating = self.MakeGrating(len(x),len(x),2,10)
+        #Grating = self.MakeGrating(len(x),len(x),2,10)
         #cv2.imshow("Grating", Grating)
 
-        X = self.gaussian2d(x,0,0.1,showResults=False)
+        X = self.gaussian2d(x,0,0.01,showResults=False)
+        cv2.imshow("Gaussian",X)
 
-        X = self.PropagateFreeSpace(1e-4,1,X,showResults=True,saveResults=True)
-        X = Grating*X
-        X = self.PropagateFreeSpace(1e-4,1,X,showResults=True,saveResults=True)
+        X = self.PropagateFreeSpace(1e-4,1e-2,X,showResults=True,saveResults=True)
+        #X = Grating*X
+        #X = self.PropagateFreeSpace(1e-4,1e-2,X,showResults=True,saveResults=True)
         
         self.saveAnimation(self.Movie_Frames,"GaussianPropagation")
 
@@ -67,16 +69,15 @@ class LightSim():
     def PropagateFreeSpace(self,d,D,X,showResults=False,saveResults=False):
         # step size is represented by d
         # total distance is represented by D
-        kx = (math.pi*2)/self.wavelength
-        #kx = 0.1
+        
         for i in range(int(D/d)):
             # The fourier transform to get to k-space
-            F = np.fft.fft2(X)
-
+            #F = np.fft.fft2(X)
+            F = sfft.fft2(X)
             F = sfft.fftshift(F)
             # Applying the propagation multiplication to the fourier space
             exponentF = -1j*self.k*d + 1j*np.pi*self.wavelength*d*self.bowl
-            print(exponentF.shape)
+        
             F[np.isnan(F)] = 0
             KF = F*np.exp(exponentF)
             KF[np.isnan(KF)] = 0
@@ -84,27 +85,21 @@ class LightSim():
             # Inversing the result to get back to real space
             X = np.fft.ifft2(KF)
 
-            #X = np.fft.ifftshift(X)
             X[np.isnan(X)] = 0
 
-            #X = np.fft.ifftshift(X)
-            if i%2==0:
-                if showResults:
-                    cv2.imshow("KF",np.real(KF))
-                    cv2.waitKey(10)
-                if showResults:
-                    cv2.imshow("X",np.real(X**2))
-                    cv2.waitKey(10)
-            else:
-                if showResults:
-                    cv2.imshow("X2",np.real(X**2))
-                    cv2.waitKey(10)
-                #if showResults:
-                #    cv2.imshow("X shift",np.real(Xs))
-                #    cv2.waitKey(100)
-                if saveResults:
-                    self.Movie_Frames[self.Movie_count,:,:] = np.real(X)
-                    self.Movie_count+=1
+            #X = sfft.ifftshift(X)
+            if showResults:
+                cv2.imshow("Fourier of Gaussian",np.abs(F**2))
+                cv2.waitKey(10)
+            if showResults:
+                cv2.imshow("KF",np.real(KF))
+                cv2.waitKey(10)
+            if showResults:
+                cv2.imshow("X",np.real(X**2))
+                cv2.waitKey(10)
+            #if saveResults:
+            #    self.Movie_Frames[self.Movie_count,:,:] = np.real(X)
+            #    self.Movie_count+=1
         
         return X
 
