@@ -1,9 +1,7 @@
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
 import numpy as np
 import math
 import cv2
-from cv2 import VideoWriter, VideoWriter_fourcc
 import scipy.fftpack as sfft
 
 ROOTDIR = "C:/Users/Unimatrix Zero/Documents/Uni Masters/Project/"
@@ -36,22 +34,11 @@ class LightSim():
 
         #cv2.imshow("bowl",self.bowl/(self.RealSpaceFactor*50)) # show the bowl (s1**2 + s2**2)
         #cv2.waitKey(0)
-        #fig = plt.figure()
-        #ax = fig.add_subplot(111, projection='3d')
-        #ax.scatter(g0, g1, self.bowl,c=data, marker="o")
-        #plt.show()
-
-        #Grating = self.MakeGrating(len(x),len(x),2,10)
-        #cv2.imshow("Grating", Grating)
 
         X = self.gaussian2d(x,0,0.01,showResults=False)
         cv2.imshow("Gaussian",X)
 
         X = self.PropagateFreeSpace(1e-1,10,X,showResults=True,saveResults=True)
-        #X = Grating*X
-        #X = self.PropagateFreeSpace(1e-4,1e-2,X,showResults=True,saveResults=True)
-        
-        self.saveAnimation(self.Movie_Frames,"GaussianPropagation")
 
     def gaussian1d(self,x, A, m, sigma):
         # The formula for a 1 dimensional gaussian
@@ -99,9 +86,6 @@ class LightSim():
             if showResults:
                 cv2.imshow("X",np.abs(X**2))
                 cv2.waitKey(10)
-            #if saveResults:
-            #    self.Movie_Frames[self.Movie_count,:,:] = np.real(X)
-            #    self.Movie_count+=1
         
         return X
 
@@ -112,19 +96,6 @@ class LightSim():
             if i%Period <barrier_width:
                 Grating[:,i] = 0
         return Grating
-
-    def saveAnimation(self,Images,name):
-        Number_frames,width,height = Images.shape   
-        #Images = Images/np.amax(Images) # normalisation step
-
-        fourcc = VideoWriter_fourcc(*'mp4v')
-        video = VideoWriter(ROOTDIR+"Results/"+name+".mp4", fourcc, 24, (width,height), False)
-
-        for i in range(Number_frames):
-            newImg = Images[i,:,:]*255
-            video.write(newImg.astype('uint8'))
-
-        video.release()
 
 
 LS = LightSim()
