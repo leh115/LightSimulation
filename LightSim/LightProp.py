@@ -95,7 +95,7 @@ class LightSim():
                 cv2.imshow("KF",np.real(KF))
                 cv2.waitKey(10)
             if showResults:
-                cv2.imshow("X",np.real(X**2))
+                cv2.imshow("X",np.abs(X**2))
                 cv2.waitKey(10)
             #if saveResults:
             #    self.Movie_Frames[self.Movie_count,:,:] = np.real(X)
