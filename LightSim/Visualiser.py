@@ -4,8 +4,8 @@ from LightProp import LightSim
 from Propagate import Propagate
 
 class Visualiser(LightSim):
-    def __init__(self, PlaneSetUp, modeNum, show_all_modes = False, save_to_file = False, show_Propagation_live = True, show_Planes = False):
-        super().__init__(PlaneSetUp, modeNum)
+    def __init__(self, show_all_modes = False, save_to_file = False, show_Propagation_live = True, show_Planes = False):
+        super().__init__()
         self.show_all_modes = show_all_modes
         self.save_to_file = save_to_file
         self.show_Propagation_live = show_Propagation_live
@@ -17,9 +17,7 @@ class Visualiser(LightSim):
         Output,
         showPlanes=False,
     ):
-        propagator = Propagate(self.PlaneSetUp, self.modeNum, show_beam=False)
-
-        animLength = int(np.sum(self.PlaneSetUp) / self.dz) + len(self.Planes) + 2
+        propagator = Propagate(show_beam=False)
         F = None
         B = None
         for mode in range(Input.shape[0]):
@@ -30,10 +28,10 @@ class Visualiser(LightSim):
                 len(self.PlaneSetUp),
             )
             if not isinstance(F,np.ndarray):
-                F = np.zeros((self.modeNum, len(propagator.Beam_Cross_Sections), self.Nx, self.Ny, 3), dtype=np.complex128)
-                B = np.zeros((self.modeNum, len(propagator.Beam_Cross_Sections), self.Nx, self.Ny, 3), dtype=np.complex128)
+                F = np.zeros((self.number_of_modes, len(propagator.Beam_Cross_Sections), self.Nx, self.Ny), dtype=np.complex128)
+                B = np.zeros((self.number_of_modes, len(propagator.Beam_Cross_Sections), self.Nx, self.Ny), dtype=np.complex128)
 
-            F[mode] = self.BeamToRGB(propagator.Beam_Cross_Sections)
+            F[mode] = propagator.Beam_Cross_Sections
 
             propagator.Beam_Cross_Sections = Output[mode]
             propagator.Propagate_FromPlane_ToPlane(
@@ -42,7 +40,7 @@ class Visualiser(LightSim):
                 Forwards=False,
             )
 
-            B[mode] = self.BeamToRGB(propagator.Beam_Cross_Sections)
+            B[mode] = propagator.Beam_Cross_Sections
 
         if self.show_all_modes:
             for m in range(F.shape[0]):
@@ -57,7 +55,7 @@ class Visualiser(LightSim):
                     "Beam Cross section B",
                     "Mode %d" % m,
                 )
-
+       
         self.VisualiseBeam(
             np.sum(np.abs(F) ** 2, axis=0)*255,
             "Beam Cross section A",
@@ -70,7 +68,17 @@ class Visualiser(LightSim):
 
         cv2.destroyAllWindows()
 
-    def VisualiseBeam(self, X, title, mode=""):
+    def VisualiseBeam(self, X:np.ndarray, title:str, mode:str=""):
+        """Turns beam cross sections into true(ish) colour cross secitons and offers ability to save to file
+
+        Args:
+            X (np.ndarray): shape: (n,X,Y) all of the cross sections
+            title (str): Name of the cross sections
+            mode (str, optional): Name of the modes. Defaults to "".
+        """
+       
+        X = self.BeamToRGB(X)
+        
         for part in range(X.shape[0]):
             if self.show_Propagation_live:
                 cv2.imshow(
@@ -149,6 +157,7 @@ class Visualiser(LightSim):
             R = ((-(wavelength - 440) / (440 - 380)) * attenuation) ** gamma
             G = 0.0
             B = (1.0 * attenuation) ** gamma
+
         elif wavelength >= 440 and wavelength <= 490:
             R = 0.0
             G = ((wavelength - 440) / (490 - 440)) ** gamma
@@ -193,11 +202,18 @@ class Visualiser(LightSim):
             np.ndarray: A coloured output beam of shape (modes, sections, Nx, Ny 3)
         """
         pseudoColour = self.wavelength_to_rgb(self.wavelength * 1e9)
-        X = np.expand_dims(X,axis=3)
-        X = np.concatenate((X,X,X),axis=3)
-        X[:, :, :, 0] = X[:, :, :, 0] * pseudoColour[0] / 255
-        X[:, :, :, 1] = X[:, :, :, 1] * pseudoColour[1] / 255
-        X[:, :, :, 2] = X[:, :, :, 2] * pseudoColour[2] / 255
+        if len(X.shape) == 3:
+            X = np.expand_dims(X,axis=3)
+            X = np.concatenate((X,X,X),axis=3)
+            X[:, :, :, 0] = X[:, :, :, 0] * pseudoColour[0] / 255
+            X[:, :, :, 1] = X[:, :, :, 1] * pseudoColour[1] / 255
+            X[:, :, :, 2] = X[:, :, :, 2] * pseudoColour[2] / 255
+        elif len(X.shape) == 4:
+            X = np.expand_dims(X,axis=4)
+            X = np.concatenate((X,X,X),axis=4)
+            X[:, :, :, :, 0] = X[:, :, :, :, 0] * pseudoColour[0] / 255
+            X[:, :, :, :, 1] = X[:, :, :, :, 1] * pseudoColour[1] / 255
+            X[:, :, :, :, 2] = X[:, :, :, :, 2] * pseudoColour[2] / 255
         return X
 
     def show_Initial(self,In,Out,wait_value=0):

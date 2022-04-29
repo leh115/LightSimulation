@@ -4,9 +4,10 @@ import scipy.fftpack as sfft
 from LightProp import LightSim
 
 
+
 class Propagate(LightSim):
-    def __init__(self, PlaneSetUp, modeNum, override_dz=False, show_beam=True):
-        super().__init__(PlaneSetUp, modeNum)
+    def __init__(self, override_dz=False, show_beam=True):
+        super().__init__()
         self.Beam_Cross_Sections = None
         self.override_dz = override_dz
         self.show_beam = show_beam
@@ -15,8 +16,6 @@ class Propagate(LightSim):
         self,
         Distance=0.1,
         Forwards=True,
-        FWHM=False,
-        printFWHM=False,
     ):
         """Propagates a beam through free space for a total distance D broken into increments of length dz
 
@@ -24,8 +23,6 @@ class Propagate(LightSim):
             Distance (float): The total distance to travel in the z direction. Defaults to 0.1.
             showBeam (bool): Defaults to True.
             Forwards (bool): Denotes direction of propagation. Defaults to True.
-            FWHM (bool): Shows the Full Width Half Maxima of every step along a beam. Defaults to False.
-            printFWHM (bool): Defaults to False.
 
         Returns:
             _type_: _description_
@@ -64,15 +61,6 @@ class Propagate(LightSim):
                 cv2.waitKey(1)
                 cv2.imshow("Beam Phase", np.angle(self.Beam_Cross_Sections[-1]))
                 cv2.waitKey(1)
-            if FWHM:
-                fwhm, w0 = self.FWHM(
-                    np.abs(self.Beam_Cross_Sections[-1]), c, (c + 1) * dz
-                )
-                if printFWHM:
-                    print(
-                        "z = %.6f, Full Width Half Maxima: %.6f, Beam Waist: %.6f"
-                        % ((c + 1) * dz, fwhm, w0)
-                    )
 
     def PropagatePhasePlane(
         self, Plane: np.ndarray, Forwards: bool = True
@@ -153,13 +141,16 @@ class Propagate(LightSim):
         """
         self.PropagateFreeSpace(other, Forwards=False)
 
-    def __or__(self, other: int):
+    def __or__(self, other: int or np.ndarray):
         """The or funciton | is not useful in the context of this class and so is replaced because it looks like a plane.
 
         Args:
             other (int): The index of the plane to travel through
         """
-        self.PropagatePhasePlane(self.Planes[other])
+        if isinstance(other,int):
+            self.PropagatePhasePlane(self.Planes[other])
+        elif isinstance(other,np.ndarray):
+            self.PropagatePhasePlane(other)
 
     def __ror__(self, other: int):
         """The ror funciton | is also not useful in the context of this class, ror defines when the class is on the opposite side of the operator (like rlshift above)
@@ -167,7 +158,10 @@ class Propagate(LightSim):
         Args:
             other (int): The index of the plane to travel through
         """
-        self.PropagatePhasePlane(self.Planes[other], Forwards=False)
+        if isinstance(other,int or np.ndarray):
+            self.PropagatePhasePlane(self.Planes[other], Forwards=False)
+        elif isinstance(other,np.ndarray):
+            self.PropagatePhasePlane(other, Forwards=False)
 
     def __str__(self) -> str:
         if len(self.Beam_Cross_Sections.shape) > 2:
@@ -177,31 +171,58 @@ class Propagate(LightSim):
 
 
 if __name__ == "__main__":
-    import MultiMode as mulmo
-
-    PlaneSetUp = [20e-3, 25e-3, 25e-3, 25e-3, 25e-3, 25e-3, 25e-3, 25e-3]
-    Number_Of_Modes = 6
+    from MultiMode import ModePosition as mulmo
+    from Visualiser import Visualiser
     InitialBeamWaist = 40e-6
     spotSeparation = np.sqrt(4) * InitialBeamWaist
 
-    propagator = Propagate(PlaneSetUp, Number_Of_Modes,override_dz=True)
-    
+    propagator = Propagate(override_dz=False,show_beam=True)
+    LightSim.number_of_modes = 15
 
-    mode_maker = mulmo.ModePosition(PlaneSetUp, Number_Of_Modes, 5)
+    mode_maker = mulmo(Amplitude = 5)
     Modes = mode_maker.makeModes(
         InitialBeamWaist,
-        spotSeparation,
-        "Square",
-        "Spot",
+        spotSeparation*10,
+        "square",
+        "hg",
     )
 
-    test_mode = Modes[3][0]
-    Noisy_Plane = np.zeros((propagator.Nx, propagator.Ny), dtype=np.complex128)
-    Noisy_Plane.real = np.random.normal(0, 1, (propagator.Nx, propagator.Ny))
-    Noisy_Plane.imag = np.random.normal(0, 1, (propagator.Nx, propagator.Ny))
-    print(Noisy_Plane)
-    propagator.Beam_Cross_Sections = test_mode
-    print(propagator)
-    propagator.Propagate_FromPlane_ToPlane(0,len(PlaneSetUp))
-    print(propagator)
-    propagator.Propagate_FromPlane_ToPlane(0,4,Forwards=False)
+    # test_mode = Modes[3][0]
+    # propagator.Beam_Cross_Sections = test_mode
+    # print(propagator)
+    # propagator.Propagate_FromPlane_ToPlane(0,len(propagator.PlaneSetUp))
+    # print(propagator)
+    # propagator.Propagate_FromPlane_ToPlane(0,4,Forwards=False)
+
+    spiral = np.arctan2(propagator.X, propagator.Y) + np.pi
+
+    cv2.imshow("Spiral",  spiral)
+    cv2.waitKey(100)
+
+    LightSim.dz /= 10
+    #LightSim.wavelength = 380e-9
+    m = 5
+    cv2.imshow("Spirals",  np.real(np.exp(1j * m * spiral)))
+    cv2.waitKey(100)
+   
+    spiral = np.exp(1j * m * spiral)
+    z_dist = 0.02
+    visual = Visualiser(save_to_file=False, show_Propagation_live=True)
+
+    propagator.Beam_Cross_Sections = np.sum(Modes,axis=0)
+    #propagator.Beam_Cross_Sections = np.ones((propagator.Nx, propagator.Ny), dtype=np.complex128)
+    propagator >> 0.01
+    propagator | spiral
+    propagator >> z_dist
+    visual.VisualiseBeam(propagator.Beam_Cross_Sections, "violet2")
+    #z_dist << propagator
+    #spiral | propagator
+    #propagator | spiral
+    #propagator >> 0.16
+    # 0.16 << propagator
+    # spiral.conj() | propagator
+    # 0.16 << propagator
+    # spiral.conj() | propagator
+    # 0.01 << propagator
+
+    

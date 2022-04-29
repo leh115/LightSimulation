@@ -1,11 +1,12 @@
+from turtle import st
 import numpy as np
 from matplotlib import pyplot as plt
 from scipy.interpolate import UnivariateSpline
 from LightProp import LightSim
 
 class Beam_Analyser(LightSim):
-    def __init__(self, PlaneSetUp, modeNum):
-        super().__init__(PlaneSetUp, modeNum)
+    def __init__(self):
+        super().__init__()
         self.CoMConvergence = []
         self.CouplingResults = []
         self.avgcoupler = []
@@ -31,19 +32,17 @@ class Beam_Analyser(LightSim):
             "sienna",
         ] * 50
 
-    def FWHM(self, X, save_number=0, z=0, show=False):
-        """Returns the Full Width Half Maximum of an image (assumed to be Gaussian)
+    def beam_width(self, X:np.ndarray, style:str = "FWHM")->float:
+        """Returns the beam width of an image (assumed to be a Gaussian Beam)
 
         Args:
-            X (np.array): A Cross Section of the beam at a position z. 
-            save_number (int): For multiple graphs, appended to file name. Defaults to 0.
-            z (int): The location in z, appended to titles for readability. Defaults to 0.
-            show (bool): Show or hide the plots of FWHM. Defaults to False.
+            X (np.ndarray): A Cross Section of the beam at a position z. 
+            style (str, optional): Can be fwhm or one_over_e_squared . Defaults to "fwhm".
 
         Returns:
-            [FWHM (float), beam waist (float)]: The Full Width Half Maximum value and conversion to beam waist value
+            float: The beam waist
         """
-        
+        style = style.upper()
         if X.dtype == np.complex128:
             X = np.abs(X)
         if isinstance(X, np.ndarray):
@@ -51,40 +50,42 @@ class Beam_Analyser(LightSim):
                 X = X[0]
                 if len(X.shape)>2:
                     X = X[0]
-
         X = np.real(X)
         s = X.shape
         lineIndex = int(s[0] / 2)
         y = X[lineIndex, :]
         y /= np.max(y)
-        x = np.linspace(0, self.Nx * self.pixelSize, s[0])
-        spline = UnivariateSpline(x, y - np.max(y) / 2, s=0)
-        r1, r2 = spline.roots()  # find the roots
-        if show:
-            print(r1)
-            print(r2)
-            print(r2 - r1)
-            plt.scatter(x, y)
-            plt.scatter(
-                np.linspace(r1, r2, 100),
-                np.ones((100)) * np.max(y) / 2,
-                s=3,
-                marker=".",
-                c="red",
-            )
-            plt.scatter(r1, np.max(y) / 2, marker="o", c="red", s=5)
-            plt.scatter(r2, np.max(y) / 2, marker="o", c="red", s=5)
-            plt.savefig(self.ROOTDIR + "Results/FWHM/%d.png" % save_number)
-            plt.title(
-                "Full Width Half Maxima: %.3fmm, z: %.3f" % (((r2 - r1) * 1000), z)
-            )
-            plt.xlabel("x position (mode)")
-            plt.ylabel("Normalised Intensity")
-            plt.show()
-            # plt.show(block=False)
-            plt.close()
-        beamWaist = (r2 - r1) * 1.699 
-        return [r2 - r1, beamWaist]
+        x = np.linspace(0, self.Nx * self.pixelSize, s[1])
+        factor_difference = 1
+        if style == "FWHM":
+            spline = UnivariateSpline(x, y - np.max(y) / 2, s=0)
+            factor_difference = 1.699 / 2
+        if style == "ONE_OVER_E_SQUARED":
+            spline = UnivariateSpline(x, y - np.max(y) * 0.13533528323, s=0)
+            factor_difference = 1 / 2
+        r1, r2 = spline.roots()
+        return (r2 - r1)*factor_difference
+
+    def show_beam_waist_calculation(self,x,y,r1,r2):
+        plt.scatter(x, y)
+        plt.scatter(
+            np.linspace(r1, r2, 100),
+            np.ones((100)) * np.max(y) / 2,
+            s=3,
+            marker=".",
+            c="red",
+        )
+        plt.scatter(r1, np.max(y) / 2, marker="o", c="red", s=5)
+        plt.scatter(r2, np.max(y) / 2, marker="o", c="red", s=5)
+        plt.savefig(self.ROOTDIR + "Results/FWHM/%d.png" % save_number)
+        plt.title(
+            "Full Width Half Maxima: %.3fmm, z: %.3f" % (((r2 - r1) * 1000), z)
+        )
+        plt.xlabel("x position (mode)")
+        plt.ylabel("Normalised Intensity")
+        plt.show()
+        # plt.show(block=False)
+        plt.close()
 
     def CentreOfMass(self, Img):
         """Returns the centre of mass of an image (a bit dodgy but kind of works)"""
@@ -129,7 +130,7 @@ class Beam_Analyser(LightSim):
         self.CoMConvergence.append(modeCentreDifferences)
 
         plt.close()
-        for mode in range(self.modeNum):
+        for mode in range(self.number_of_modes):
             for x in range(len(self.CoMConvergence)):
                 plt.scatter(x, self.CoMConvergence[x][mode], c=self.modeColours[mode])
         plt.title("Centre of Mass Convergence")
@@ -195,7 +196,53 @@ class Beam_Analyser(LightSim):
             + ".png"
         )
     
-    def Theoretical_BeamWaist(self, w0, z, zR):
-        """Returns the beam waist wz at a given value of z"""
-        return w0 * np.sqrt(1 + (z / zR) ** 2)
+    def w0_theory_vs_sim(self, X, z, initial_beam_waist):
+        sim_wz = self.beam_width(X,style="one_over_e_squared")
+        theory_wz = self.Theoretical_BeamWaist(initial_beam_waist,z)
+        return [sim_wz, theory_wz]
     
+if __name__ == "__main__":
+    from Propagate import Propagate
+    from MultiMode import ModePosition as mulmo
+    LightSim.Nx += 1
+    LightSim.number_of_modes = 1
+    mode_maker = mulmo(Amplitude=1)
+    propagator = Propagate(override_dz=True)
+    analyser = Beam_Analyser()
+    
+    w0 = 30e-6
+    single_mode = mode_maker.makeModes(w0,0,"central","spot")[0]
+    
+    differences = []
+    factor_difference = []
+    for i in range(900):
+        z = 0.01+ 0.0001*i
+        propagator.Beam_Cross_Sections = single_mode
+        propagator >> z
+        X = propagator.Beam_Cross_Sections[-1]
+        sim_wz, theory_wz = analyser.w0_theory_vs_sim(X, z, w0)
+        plt.scatter(z, sim_wz, color="red")
+        plt.scatter(z, theory_wz, color="blue")
+        print(f"Factor difference: {theory_wz / sim_wz}", f"Difference: {theory_wz - sim_wz}",sep=" ~~ ")
+        differences.append(theory_wz - sim_wz)
+        factor_difference.append(theory_wz / sim_wz)
+        print(i)
+
+    plt.title("Beam waist at distance z")
+    plt.xlabel("Distance z (m)")
+    plt.ylabel("Beam Waist (m)")
+    plt.legend(["Simulation","Theory"])
+    plt.show()
+    plt.scatter(np.linspace(0.01,0.01+0.001*i,i+1), factor_difference, color="blue")
+    import matplotlib
+    y_formatter = matplotlib.ticker.ScalarFormatter(useOffset=False)
+    plt.gca().yaxis.set_major_formatter(y_formatter)
+    plt.title("Theory/Simulation breakdown")
+    plt.xlabel("Distance z (m)")
+    plt.ylabel(r'$\omega_{z_{Theory}} / \omega_{z_{Simulation}}$')
+    plt.show()
+    plt.scatter(np.linspace(0.01,0.01+0.001*i,i+1), differences, color="blue")
+    plt.title("Theory - Simulation breakdown")
+    plt.xlabel("Distance z (m)")
+    plt.ylabel(r'$\omega_{z_{Theory}} - \omega_{z_{Simulation}}$')
+    plt.show()

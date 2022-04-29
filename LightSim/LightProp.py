@@ -9,30 +9,26 @@ from tqdm import tqdm
 class LightSim:
     Planes = None
     VERSION = 1
+    Variable_Name = ""
     ROOTDIR = "C:/Users/Unimatrix Zero/Documents/Uni Masters/Project/"
+    kFilter = 0.1
+    wavelength = 1565e-9
+    resolution = 1
+    k = 2 * np.pi / wavelength # Wavenumber of light
+    dz = 5e-3
+    pixelSize = 8e-6 * 2
+    Nx = int(2.192e-3 / pixelSize) * 2 * resolution
+    Ny = int(2.192e-3 / pixelSize) * 2 * resolution
+    number_of_modes = 5
+    PlaneSetUp = [20e-3, 25e-3, 25e-3, 25e-3, 25e-3, 25e-3, 25e-3, 25e-3]
+    phase_plane_components = [1, 0]
 
-    def __init__(self, PlaneSetUp, modeNum):
-        self.modeNum = modeNum
-        self.PlaneSetUp = PlaneSetUp
-        self.pixelSize = (
-            8e-6  # JC chooses 8e-6 for a width of 274pixels so plane width is 2.192e-3m
-        )
-
-        self.Nx = int(2.192e-3 / self.pixelSize)
-        self.Ny = int(2.192e-3 / self.pixelSize)
-
-        self.dz = 5e-3  # speed of propagation through space
-        self.wavelength = 1565e-9  # choose values between 380nm and 750nm
-        self.kFilter = 0.1
-        self.maskOffset = np.sqrt(1e-4 / (self.Nx * self.Ny * self.modeNum))
-        self.Variable_Name = ""
+    def __init__(self):
         
         if self.Planes == None:
             self.Planes = []
-            for _ in range(len(PlaneSetUp) - 1):
-                self.Planes.append(self.MakePhasePlane())
-
-        
+            for _ in range(len(self.PlaneSetUp) - 1):
+                self.Planes.append(self.make_phase_plane(self.phase_plane_components[0], self.phase_plane_components[1]))
 
         self.x = (
             np.linspace(-self.Nx / 2, self.Nx / 2, self.Nx) * self.pixelSize
@@ -56,40 +52,75 @@ class LightSim:
         )
         self.vx, self.vy = np.meshgrid(linearKx, linearKy)
 
-        #self.bowl = (2 * np.pi) * np.sqrt(  ( ( 1/self.wavelength )**2 - self.vx**2 - self.vy**2 )).T
-        self.bowl = 2 * (2 * np.pi) * np.sqrt(
+        self.bowl = 0.7 * (2 * np.pi) * np.sqrt(
             (
                 (1 / self.wavelength) ** 2
-                - (self.vx**2 + self.vy**2) / (2 * np.pi) ** 2
+                - (self.vx**2 + self.vy**2) 
             )
-        ).T
+        )#.T
 
     def __repr__(self) -> str:
-        return f"<LightSim({self.PlaneSetUp}, {self.modeNum}) object>"
+        return f"<LightSim({self.PlaneSetUp}, {self.number_of_modes}) object>"
 
     def cart2pol(self, x, y):
         rho = np.sqrt(x**2 + y**2)
         phi = np.arctan2(y, x)
         return (rho, phi)
 
-    @classmethod
-    def update_plane(cls, new_planes):
-        cls.Planes = new_planes
+    def make_phase_plane(self, re:float = 1, im:float = 0):
+        """Generates a complex valued, repeated value phase plane
 
-    def MakePhasePlane(self):
-        planeSize = (self.Nx, self.Ny)
-        Plane = np.ones(planeSize, dtype=np.complex128)
+        Args:
+            re (float, optional): A single value for the real components of the phase plane. Defaults to 1.
+            im (float, optional): A single value for the imaginary components of the phase plane. Defaults to 0.
+
+        Returns:
+            np.ndarray: The complex valued phase plane
+        """
+        real_components = re * np.ones((self.Nx, self.Ny), dtype=np.float)
+        imaginary_components = im * np.ones((self.Nx, self.Ny), dtype=np.float)
+        Plane = real_components + 1j * imaginary_components
+        #Plane = np.ones((self.Nx, self.Ny), dtype=np.complex128)
         return Plane
+    
+    def Theoretical_BeamWaist(self, w0:float, z:float, rayleigh_length:float=-1,wavelength:float=-1):
+        """Returns the beam waist at a given value of z
+
+        Args:
+            w0 (float): The initial beam waist
+            z (float): The distance in the axial direction to take a measurement of the beam waist
+            rayleigh_length (float, optional): The known Rayleigh length of the beam. Defaults to the inferred Rayleigh length from provided parameters.
+            wavelength (float, optional): The wavelength of the beam. Defaults to the systems current wavelength.
+
+        Returns:
+            float: The expected beam waist
+        """
+        if wavelength == -1:
+            wavelength = self.wavelength
+        if rayleigh_length == -1:
+            rayleigh_length = self.Rayleigh_Length(w0, wavelength)
+        return w0 * np.sqrt(1 + (z / rayleigh_length) ** 2)
+    
+    def Rayleigh_Length(self,w0:float,wavelength:float = None):
+        """Calculates the Rayleigh length for a given wavelength and input beam waist
+
+        Args:
+            w0 (float): Initial beam waist
+            wavelength (float): The wavelength of light
+
+        Returns:
+            float: The Rayleigh length
+        """
+        if wavelength == None:
+            wavelength = self.wavelength
+        return np.pi * w0**2 / wavelength
 
 if __name__ == "__main__":
     # For N planes there will be N+1 distances through free space e.g: ----|-------|-----|------------|----
     # Here are 5 propagation distances to calculate and only 4 planes    1      2     3         4        5
 
     # Boolean Switches
-    show_Initial_States = False
-    Show_FWHM = False
     validateBeamWaist = False
-    NormaliseInputs = True
 
     ConvergenceResults = []
     CouplingResults = []
@@ -109,35 +140,11 @@ if __name__ == "__main__":
         12,
         13,
         14,
-    ]  # np.linspace(1e-6,300e-6,2000)
+    ] 
     for Var_Num, Variable in enumerate(Variable_Tests):
         VERSION = Var_Num
-        # The set-up chosen by Joel Carpenter is a set of seven planes with a distance of 20mm before the first plane and 12.5mm*2 between each mirror
-        PlaneSetUp = [
-            20e-3,
-            25e-3,
-            25e-3,
-            25e-3,
-            25e-3,
-            25e-3,
-            25e-3,
-            25e-3,
-        ]  # JC plane set-up
-        Number_Of_Modes = Variable  # 12
-        InitialBeamWaist = 40e-6  # Joel Carpenter chooses w0 = 30e-6 and an exit beam of wz = 200e-6            #### I tested on 35e-6 for this
-        spotSeparation = (
-            np.sqrt(4) * InitialBeamWaist
-        )  # Joel Carpenter chooses separation of 89.8e-6
-
-        # The question becomes, how do we get an exit beam of wz = 200e-6 ???
-        # My assumption is that we have to give it a different input beam waist so that it propagates to a smaller beam...
-        # I found that the closest to 200e-6 I could get from some simple envelope calcs was 400e-6 using an initial beam waist larger than my other one??!!
-        # Exit_InitialBeamWaist = 3e-4
-        Exit_InitialBeamWaist = (
-            spotSeparation * np.sqrt(Number_Of_Modes) / 2
-        )  # I want the beam to interact with every part of the spot array, the array has a diameter of approx. one side length which is (separation dist) * sqrt(number of modes)
-
-        Ls = LightSim(PlaneSetUp, Number_Of_Modes)
+        
+        Ls = LightSim()
         Ls.kFilter = 100
         Ls.Variable_Name = Variable_Name
         Ls.maskOffset *= 40
@@ -152,80 +159,6 @@ if __name__ == "__main__":
             "Dimensions of image: (%.2fcm, %.2fcm)"
             % (Ls.Nx * Ls.pixelSize * 100, Ls.Ny * Ls.pixelSize * 100)
         )
-
-        if validateBeamWaist:
-            for i in tqdm(range(50)):
-                z = (i + 1) * Ls.dz
-                X = Ls.PropagateFreeSpace(
-                    np.array([HGs.makeHG(0, 0, Ls.wavelength, InitialBeamWaist)]),
-                    Dist=z,
-                    showBeam=False,
-                    overridedz=True,
-                    newdz=z,
-                )[-1]
-                fwhm, wz_fwhm = Ls.FWHM(np.abs(X), 0, z)
-                plt.scatter(z, wz_fwhm, color="red")
-                plt.scatter(
-                    z,
-                    Ls.Theoretical_BeamWaist(InitialBeamWaist, z, RayLen),
-                    color="blue",
-                )
-            plt.title("Beam waist at distance z")
-            plt.xlabel("Distance z (m)")
-            plt.ylabel("Beam Waist (m)")
-            plt.show()
-
-        # Initialise Forward and Backward Propagating Fields:
-        if show_Initial_States:
-            BProp2 = np.zeros((Number_Of_Modes, 1, Ls.Nx, Ls.Ny), dtype=np.complex128)
-            FProp2 = np.zeros((Number_Of_Modes, 1, Ls.Nx, Ls.Ny), dtype=np.complex128)
-        FProp = Mds.makeModes(
-            Number_Of_Modes,
-            Ls.wavelength,
-            InitialBeamWaist,
-            spotSeparation,
-            "Square",
-            "Spot",
-        )
-        BProp = Mds.makeModes(
-            Number_Of_Modes, Ls.wavelength, Exit_InitialBeamWaist, 0, "Central", "HG"
-        )
-
-        # Propagate to end for Backwards propagation
-        for m in range(Number_Of_Modes):
-            BProp[m] = Ls.PropagateFreeSpace(
-                [BProp[m][0]],
-                np.sum(PlaneSetUp),
-                showBeam=False,
-                overridedz=True,
-                newdz=np.sum(PlaneSetUp),
-            )[
-                -1
-            ]  # propagates to the output so that I can work backwards from there
-            if show_Initial_States:
-                FProp2[m] = Ls.PropagateFreeSpace(
-                    [FProp[m][0]],
-                    np.sum(PlaneSetUp),
-                    showBeam=False,
-                    overridedz=True,
-                    newdz=np.sum(PlaneSetUp),
-                )[-1]
-                BProp2[m] = Ls.PropagateFreeSpace(
-                    [BProp[m][0]],
-                    np.sum(PlaneSetUp),
-                    Forwards=False,
-                    showBeam=False,
-                    overridedz=True,
-                    newdz=np.sum(PlaneSetUp),
-                )[-1]
-
-        if show_Initial_States:
-            cv2.imshow("FProp", np.abs(np.sum(FProp**2, axis=0))[0])
-            cv2.imshow("FProp2", np.abs(np.sum(FProp2**2, axis=0))[0])
-
-            cv2.imshow("BProp", np.sum(np.abs(BProp) ** 2, axis=0)[0])
-            cv2.imshow("BProp2", np.sum(np.abs(BProp2) ** 2, axis=0)[0])
-            cv2.waitKey(0)
 
         ConvergenceResults.append(Ls.avgFieldConv)
         plt.close()

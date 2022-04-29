@@ -1,4 +1,3 @@
-from array import array
 import numpy as np
 import HermiteGaussianClass as HG
 import cv2
@@ -7,16 +6,16 @@ from Propagate import Propagate
 
 
 class ModePosition(LightSim):
-    def __init__(self, PlaneSetUp, modeNum, Amplitude):
-        super().__init__(PlaneSetUp, modeNum)
-        self.HGs = HG.HermiteGaussian(PlaneSetUp, modeNum)
+    def __init__(self, Amplitude):
+        super().__init__()
+        self.HGs = HG.HermiteGaussian()
         self.Amplitude = Amplitude
 
     def NormaliseInitialCrossSection(self, X):
         X *= self.Amplitude / np.sqrt(np.max(np.abs(X) ** 2))
         return X
 
-    def combinationsUptoN(self, n:int, modesOnly:bool=False) -> list:
+    def combinationsUptoN(self, n: int, modesOnly: bool = False) -> list:
         """Some really crude code to generate the initial nth combinations of [-N:N , -K:K] for two unknowns N and K
 
         Args:
@@ -63,119 +62,115 @@ class ModePosition(LightSim):
         separation: float,
         pattern: str,
         modeType: str,
+        start_mode: int = 0,
     ) -> np.array:
         """Sets up an array of shape (modes, 1 , Beam shape x, Beam shape y)
 
         Args:
             w0 (float): Initial beam waist
             separation (float): Distance (approx.) between modes in x,y
-            pattern (str): Choose from:"Central" -> all modes in centre, "Square" -> a square pattern, "Fib" -> a Fibonacci spiral
-            modeType (str): Choose from: "HG" -> Hermite Gaussian modes, increasing in value, "Spot"-> simple Gaussian modes
+            pattern (str): Choose from:"central" -> all modes in centre, "square" -> a square pattern, "fib" -> a Fibonacci spiral
+            modeType (str): Choose from: "hg" -> Hermite Gaussian modes, increasing in value, "spot"-> simple Gaussian modes
+            start_mode (int): The first mode to start on (useful for choosing a subset of modes)
         Returns:
             np.array: an array containing all of the modes
         """
+        pattern = pattern.upper()
+        modeType = modeType.upper()
+        assert (
+            modeType == "SPOT" or modeType == "HG"
+        ), f"{modeType} is not a valid type of mode"
+        assert (
+            pattern == "FIB"
+            or pattern == "CENTRAL"
+            or pattern == "SQUARE"
+            or pattern == "INV_SQUARE"
+            or pattern == "RIGHT_LEFT"
+            or pattern == "LEFT_RIGHT"
+            or pattern == "UP_DOWN"
+            or pattern == "DOWN_UP"
+        ), f"{pattern} is not a valid type of pattern"
 
-        Modes = np.zeros((self.modeNum, 1, self.Nx, self.Ny), dtype=np.complex128)
+        Modes = np.zeros(
+            (self.number_of_modes, 1, self.Ny, self.Nx), dtype=np.complex128
+        )
+        if modeType == "SPOT":
+            mode_values = np.zeros((self.number_of_modes, 2))
 
-        if pattern == "Fib":
+        elif modeType == "HG":
+            mode_values = self.combinationsUptoN(
+                self.number_of_modes + self.number_of_modes * 10, modesOnly=True
+            )  # requires a safety net of extra modes
+
+        position_values = np.zeros((self.number_of_modes, 2))
+        line_vals = (
+            np.arange(start=0, stop=self.number_of_modes) - self.number_of_modes / 2
+        ) * separation
+        if pattern == "FIB":
             theta = np.pi * 137.5077 / 180  # the golden angle
             A = separation * 2
-            if modeType == "Spot":
-                for m in range(self.modeNum):
-                    Modes[m] = self.NormaliseInitialCrossSection(
-                        np.array(
-                            [
-                                self.HGs.makeHG(
-                                    0,
-                                    0,
-                                    w0,
-                                    xshift=m**1.5 * A * np.cos(theta * m) / (m + 1),
-                                    yshift=m**1.5 * A * np.sin(theta * m) / (m + 1),
-                                )
-                            ]
-                        )
-                    )
-            if modeType == "HG":
-                m_n_mode_values = self.combinationsUptoN(
-                    self.modeNum + self.modeNum * 10, modesOnly=True
-                )  # requires a safety net of extra modes
-                for m in range(self.modeNum):
-                    Modes[m] = self.NormaliseInitialCrossSection(
-                        np.array(
-                            [
-                                self.HGs.makeHG(
-                                    m_n_mode_values[m][0],
-                                    m_n_mode_values[m][1],
-                                    w0,
-                                    xshift=m**1.5 * A * np.cos(theta * m) / (m + 1),
-                                    yshift=m**1.5 * A * np.sin(theta * m) / (m + 1),
-                                )
-                            ]
-                        )
-                    )
+            ints_to_n = np.arange(start=0, stop=self.number_of_modes)
+            xs = ints_to_n**1.5 * A * np.cos(theta * ints_to_n) / (ints_to_n + 1)
+            ys = ints_to_n**1.5 * A * np.sin(theta * ints_to_n) / (ints_to_n + 1)
+            for i, x, y in zip(ints_to_n, xs, ys):
+                position_values[i] = [x, y]
 
-        if pattern == "Central":
+        elif pattern == "CENTRAL":
+            pass
 
-            if modeType == "Spot":
-                for m in range(self.modeNum):
-                    Modes[m] = self.NormaliseInitialCrossSection(
-                        np.array([self.HGs.makeHG(0, 0, w0)])
-                    )
-            if modeType == "HG":
-                m_n_mode_values = self.combinationsUptoN(
-                    self.modeNum + self.modeNum * 10, modesOnly=True
-                )  # requires a safety net of extra modes
-                for m in range(self.modeNum):
-                    Modes[m] = self.NormaliseInitialCrossSection(
-                        np.array(
-                            [
-                                self.HGs.makeHG(
-                                    m_n_mode_values[m][0],
-                                    m_n_mode_values[m][1],
-                                    w0,
-                                )
-                            ]
-                        )
-                    )
-        if pattern == "Square":
+        elif pattern == "SQUARE":
+            position_values = (
+                np.array(self.combinationsUptoN(self.number_of_modes)) * separation
+            )
 
-            if modeType == "Spot":
-                m_n_mode_values = self.combinationsUptoN(self.modeNum)
-                for m in range(self.modeNum):
-                    Modes[m] = self.NormaliseInitialCrossSection(
-                        np.array(
-                            [
-                                self.HGs.makeHG(
-                                    0,
-                                    0,
-                                    w0,
-                                    xshift=m_n_mode_values[m][0] * separation,
-                                    yshift=m_n_mode_values[m][1] * separation,
-                                )
-                            ]
-                        )
-                    )
-            if modeType == "HG":
-                m_n_position_values = self.combinationsUptoN(self.modeNum)
-                m_n_mode_values = self.combinationsUptoN(self.modeNum + self.modeNum * 10, modesOnly=True)
-                for m in range(self.modeNum):
-                    Modes[m] = self.NormaliseInitialCrossSection(
-                        np.array(
-                            [
-                                self.HGs.makeHG(
-                                    m_n_mode_values[m][0],
-                                    m_n_mode_values[m][1],
-                                    w0,
-                                    xshift=m_n_position_values[m][0] * separation,
-                                    yshift=m_n_position_values[m][1] * separation,
-                                )
-                            ]
-                        )
-                    )
+        elif pattern == "INV_SQUARE":
+            xs = np.array(self.combinationsUptoN(self.number_of_modes)) * separation
+            for i, x in enumerate(xs):
+                position_values[-(i + 1)] = x
 
-        return Modes
-    
-    def make_input_output_modes(self, w0:float, w1:float, separation0:float, separation1:float, pattern_to_pattern:str, mode_type_to_mode_type:str) -> list:
+        elif pattern == "LEFT_RIGHT":
+            for i, x in enumerate(line_vals):
+                position_values[i] = [x, 0]
+
+        elif pattern == "RIGHT_LEFT":
+            for i, x in enumerate(line_vals):
+                position_values[-(i + 1)] = [x, 0]
+
+        elif pattern == "UP_DOWN":
+            for i, y in enumerate(line_vals):
+                position_values[i] = [0, y]
+
+        elif pattern == "DOWN_UP":
+            for i, y in enumerate(line_vals):
+                position_values[-(i + 1)] = [0, y]
+
+        for m in range(start_mode, self.number_of_modes):
+            Modes[m] = self.NormaliseInitialCrossSection(
+                np.array(
+                    [
+                        self.HGs.makeHG(
+                            mode_values[m][0],
+                            mode_values[m][1],
+                            w0,
+                            xshift=position_values[m][0],
+                            yshift=position_values[m][1],
+                        )
+                    ]
+                )
+            )
+        LightSim.number_of_modes -= start_mode
+        return Modes[start_mode:]
+
+    def make_input_output_modes(
+        self,
+        w0: float,
+        w1: float,
+        separation0: float,
+        separation1: float,
+        pattern_to_pattern: str,
+        mode_type_to_mode_type: str,
+        start_mode: int = 0,
+    ) -> list:
         """Parses a string to generate input and output modes
 
         Args:
@@ -185,30 +180,48 @@ class ModePosition(LightSim):
             separation1 (float): Separation of output modes
             pattern_to_pattern (str): Of form "pattern -> pattern"
             mode_type_to_mode_type (str): Of form "mode_type -> mode_type"
-
+            start_mode (int): The first mode to start on (useful for choosing a subset of modes)
         Returns:
             list: Of form [input_modes, output_modes]
         """
         input_pattern, output_pattern = pattern_to_pattern.split(" -> ")
         input_mode_type, output_mode_type = mode_type_to_mode_type.split(" -> ")
-        modes = self.makeModes(w0, separation0, input_pattern, input_mode_type)
-        propagator = Propagate(self.PlaneSetUp, self.modeNum, override_dz=True)
-        output_modes = self.makeModes(w1, separation1, output_pattern, output_mode_type)
+        modes = self.makeModes(
+            w0, separation0, input_pattern, input_mode_type, start_mode=start_mode
+        )
+        propagator = Propagate(override_dz=True, show_beam=False)
+        LightSim.number_of_modes = self.number_of_modes + start_mode
+        output_modes = self.makeModes(
+            w1, separation1, output_pattern, output_mode_type, start_mode=start_mode
+        )
         for i, mode in enumerate(modes):
             propagator.Beam_Cross_Sections = mode[0]
-            propagator >> np.sum(self.PlaneSetUp)
+            propagator >> np.sum(propagator.PlaneSetUp)
             output_modes[i][0] = propagator.Beam_Cross_Sections[-1]
 
         return [modes, output_modes]
 
 
 if __name__ == "__main__":
-    PlaneSetUp = [20e-3, 25e-3, 25e-3, 25e-3, 25e-3, 25e-3, 25e-3, 25e-3]
-    Number_Of_Modes = 6
-    Mds = ModePosition(PlaneSetUp, Number_Of_Modes, 5)
-    Mds.make_input_output_modes(1,1,1,1,"Fib -> Square","Spot -> HG")
-    M = Mds.makeModes(60e-6, np.sqrt(3) * 60e-6, "Square", "Spot")
-    cv2.imshow("Modes", np.sum(np.abs(M), axis=0)[0])
-    # cv2.imwrite("C:/Users/Unimatrix Zero/Documents/Uni Masters/Project/Figures and Demos/Mode Positions.png",255*np.sum(np.abs(M),axis=0)[0])
-    cv2.waitKey(0)
-    print(Mds.combinationsUptoN(5, modesOnly=True))
+    LightSim.number_of_modes = 30
+    mode_maker = ModePosition(Amplitude=1)
+    # mode_maker.make_input_output_modes(1,1,1,1,"Fib -> Square","Spot -> HG")
+    mode_maker.make_input_output_modes(
+        30e-6,
+        30e-6,
+        120e-6,
+        120e-6,
+        "left_right -> left_right",
+        "spot -> spot",
+        start_mode=1,
+    )
+    for i in range(mode_maker.number_of_modes):
+        LightSim.number_of_modes = 30
+        M = mode_maker.makeModes(
+            20e-6, np.sqrt(3) * 60e-6, "inv_square", "HG", start_mode=i
+        )
+
+        cv2.imshow("Modes", np.sum(np.abs(M), axis=0)[0])
+        # cv2.imwrite("C:/Users/Unimatrix Zero/Documents/Uni Masters/Project/Figures and Demos/Mode Positions.png",255*np.sum(np.abs(M),axis=0)[0])
+        cv2.waitKey(100)
+    print(mode_maker.combinationsUptoN(5, modesOnly=True))

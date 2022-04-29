@@ -6,13 +6,14 @@ from Visualiser import Visualiser
 import numpy as np
 import cv2
 
+
 class Updater(LightSim):
-    def __init__(self, PlaneSetUp, modeNum):
-        super().__init__(PlaneSetUp, modeNum)
-        self.modeNum = modeNum
+    def __init__(self, mask_offset=0.001):
+        super().__init__()
         self.updated_planes = [None] * (len(self.Planes))
-        self.analyser = Beam_Analyser(PlaneSetUp, modeNum)
+        self.analyser = Beam_Analyser()
         self.show_modes_at_start = False
+        self.mask_offset = (np.sqrt(1e-3/(self.Nx*self.Ny)) + 10j*np.sqrt(1e-3/(self.Nx*self.Ny)))
 
     def UpdatePhasePlane(
         self,
@@ -20,7 +21,6 @@ class Updater(LightSim):
         B: np.ndarray,
         Plane: np.ndarray,
         plane_number: int,
-        push_to_class_var: bool = False,
     ):
         """Updates a single phase plane by comparing backwards and forwards propagation
 
@@ -32,33 +32,25 @@ class Updater(LightSim):
         """
 
         # * Really this method should be within the <LightSim> class because it is changing a class variable of <LightSim> NOT <Updater>, however this lets me separate out the process of updating into its own neat class and tidies up the <LightSim> class a lot
-        if not push_to_class_var:
-            Current_Mask = np.exp(1j * np.angle(Plane))
-            Mask2 = F * B.conj()
-            Normaliser = np.sqrt(np.sum(np.abs(F) ** 2) * np.sum(np.abs(B.conj()) ** 2))
-            Mask2 /= Normaliser
+        Current_Mask = np.exp(1j * np.angle(Plane))
+        Normaliser = np.sqrt(np.sum(np.abs(F) ** 2) * np.sum(np.abs(B.conj()) ** 2))
+        motionless_matrix = F * B.conj() / Normaliser
 
-            if not isinstance(self.updated_planes, np.ndarray):
-                self.updated_planes[plane_number] = (
-                    Mask2 * np.exp(-1j * np.angle(np.sum(Mask2 * Current_Mask.conj())))
-                    + self.maskOffset
-                )
-            else:
-                self.updated_planes[plane_number] = np.add(
-                    self.updated_planes[plane_number],
-                    (
-                        Mask2
-                        * np.exp(-1j * np.angle(np.sum(Mask2 * Current_Mask.conj())))
-                        + self.maskOffset
-                    ),
-                )
-
+        # * Checks if the updated_planes var has been initialised yet before adding anything to it
+        if not isinstance(self.updated_planes[plane_number], np.ndarray):
+            self.updated_planes[plane_number] = (
+                motionless_matrix * np.exp(-1j * np.angle(np.sum(motionless_matrix * Current_Mask.conj())))
+                + self.mask_offset
+            )
         else:
-            for plane_num in range(len(self.Planes)):
-                self.Planes[plane_num] = self.updated_planes[plane_num]
-
-            Ls = LightSim(self.PlaneSetUp, self.modeNum)
-            Ls.update_plane(self.Planes)
+            self.updated_planes[plane_number] = np.add(
+                self.updated_planes[plane_number],
+                (
+                    motionless_matrix
+                    * np.exp(-1j * np.angle(np.sum(motionless_matrix * Current_Mask.conj())))
+                    + self.mask_offset
+                ),
+            )
 
     def Update_All_Planes(
         self, Input: np.ndarray, Output: np.ndarray, showPrePostPlane: bool = False
@@ -73,12 +65,8 @@ class Updater(LightSim):
         Complex_Difference = 0
         Coupling_Matrix = np.zeros((Input.shape[0]), dtype=np.float)
         modeCentreDifferences = []
-        Forwards_propagator = Propagate(
-            self.PlaneSetUp, self.modeNum, override_dz=True, show_beam=False
-        )
-        Backwards_propagator = Propagate(
-            self.PlaneSetUp, self.modeNum, override_dz=True, show_beam=False
-        )
+        Forwards_propagator = Propagate(override_dz=True, show_beam=False)
+        Backwards_propagator = Propagate(override_dz=True, show_beam=False)
         self.updated_planes = [None] * (len(self.Planes))
         for mode in range(Input.shape[0]):
 
@@ -123,9 +111,10 @@ class Updater(LightSim):
                             F, B, self.Planes[plane_number], plane_number
                         )
 
-        self.UpdatePhasePlane(
-            F, B, np.ones((1, 1), dtype=bool), -1, push_to_class_var=True
-        )
+        for plane_num, updated_plane in enumerate(self.updated_planes):
+            self.Planes[plane_num] = updated_plane
+
+        LightSim.Planes = self.Planes
 
         self.analyser.coupleMat.append(np.sum(Coupling_Matrix))
         self.analyser.avgcoupler = np.sum(
@@ -157,10 +146,12 @@ class Updater(LightSim):
             showAllModes (bool, optional): When visualising, should each mode be shown individually? Defaults to False.
             showAnyProgress (bool, optional): If False, nothing will be shown. Defaults to True.
         """
-        visual = Visualiser(self.PlaneSetUp, self.modeNum, show_all_modes=showAllModes,show_Propagation_live=show_Propagation_live)
-        
+        visual = Visualiser(
+            show_all_modes=showAllModes, show_Propagation_live=show_Propagation_live
+        )
+
         if self.show_modes_at_start:
-            visual.show_Initial(Input,Output)
+            visual.show_Initial(Input, Output)
 
         for GradDescent in range(EpochNumber):
             In = Input.copy()
@@ -169,6 +160,7 @@ class Updater(LightSim):
             self.Update_All_Planes(
                 In, Out, showPrePostPlane=False
             )  # Correct for all of the planes
+
             print("Epoch: %d" % (GradDescent))
 
             if GradDescent % samplingRate == 0:
@@ -178,23 +170,23 @@ class Updater(LightSim):
 if __name__ == "__main__":
     from MultiMode import ModePosition as mulmo
 
-    PlaneSetUp = [20e-3, 25e-3, 25e-3, 25e-3, 25e-3, 25e-3, 25e-3, 25e-3]
     Number_Of_Modes = 10
     InitialBeamWaist = 40e-6
     spotSeparation = np.sqrt(4) * InitialBeamWaist
 
-    mode_maker = mulmo(PlaneSetUp, Number_Of_Modes, 1)
+    mode_maker = mulmo(Amplitude=1)
     modes = mode_maker.makeModes(InitialBeamWaist, spotSeparation, "Fib", "Spot")
     output_modes = np.zeros(
-        (mode_maker.modeNum, 1, mode_maker.Nx, mode_maker.Ny), dtype=np.complex128
+        (mode_maker.number_of_modes, 1, mode_maker.Nx, mode_maker.Ny),
+        dtype=np.complex128,
     )
 
-    propagator = Propagate(PlaneSetUp, Number_Of_Modes, override_dz=True)
+    propagator = Propagate(override_dz=True)
     for i, mode in enumerate(modes):
         propagator.Beam_Cross_Sections = mode[0]
-        propagator >> np.sum(PlaneSetUp)
+        propagator >> np.sum(propagator.PlaneSetUp)
         output_modes[i][0] = propagator.Beam_Cross_Sections[-1]
 
-    updater = Updater(PlaneSetUp, Number_Of_Modes)
+    updater = Updater()
     updater.GradientDescent(modes, output_modes, 100, samplingRate=10)
     # conclusion is that once the secondary starts updating itself it initialises its variables and stops checking main anymore: so the warning is to only use the main variable and make sure that secondary is actually updating it.

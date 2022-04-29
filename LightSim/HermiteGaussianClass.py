@@ -4,12 +4,19 @@ from LightProp import LightSim
 
 
 class HermiteGaussian(LightSim):
-    def __init__(self, PlaneSetUp, modeNum):
-        super().__init__(PlaneSetUp, modeNum)
-        self.xDim = self.Nx * self.pixelSize
-        self.yDim = self.Ny * self.pixelSize
+    def __init__(self):
+        super().__init__()
 
-    def hermiteH(self, n, x):
+    def hermiteH(self, n:int, x:np.ndarray):
+        """Returns a Hermite Polynomial of order n
+
+        Args:
+            n (int): The order of the polynomial
+            x (np.ndarray): The space that the polynomial is broadcast to
+
+        Returns:
+            np.ndarray: The Hermite Polynomial
+        """
         if n == 0:
             return 1
         elif n == 1:
@@ -20,42 +27,46 @@ class HermiteGaussian(LightSim):
             )
 
     def makeHG(
-        self, n, m, w0, xshift: float = 0, yshift: float = 0, z: float = 0
+        self, n:int, m:int, w0:float, xshift: float = 0, yshift: float = 0, z: float = 0
     ):
-        k = 2 * np.pi / self.wavelength # Wavenumber of light
+        """Makes a Hermite Gaussian Mode with n Horizontal and m Vertical mode indices
 
-        zR = (k * w0**2.0) / 2
+        Args:
+            n (int): Horizontal mode index
+            m (int): Vertical mode index
+            w0 (float): Beam waist at z = 0
+            xshift (float, optional): X distance from center of simulated area. Defaults to 0.
+            yshift (float, optional): Y distance from center of simulated area. Defaults to 0.
+            z (float, optional): The distance in the axial direction to propagate. Defaults to 0.
+
+        Returns:
+            np.ndarray: A single HGnm mode
+        """
+        rayleigh_length = self.Rayleigh_Length(w0)
         if z != 0:
-            Rz_inv = 1 / (z * (1 + (zR / z) ** 2))
+            Rz_inv = 1 / (z * (1 + (rayleigh_length / z) ** 2))
         else:
             Rz_inv = 0
-        wz = w0 * np.sqrt(1 + (z / zR) ** 2)
-        # ! I think this should be self.xDim/2 and self.yDim/2, needs implementing
-        [xx, yy] = np.meshgrid(
-            np.linspace(-self.xDim/2, self.xDim/2, self.Nx),
-            np.linspace(-self.yDim/2, self.yDim/2, self.Ny),
-        )
+        wz = w0 * np.sqrt(1 + (z / rayleigh_length) ** 2)
         U00 = (
             1.0
-            / (1 + 1j * z / zR)
+            / (1 + 1j * z / rayleigh_length)
             * np.exp(
-                -((xx - xshift) ** 2 + (yy - yshift) ** 2) / wz**2 / (1 + 1j * z / zR)
+                -((self.X - xshift) ** 2 + (self.Y - yshift) ** 2) / wz**2 / (1 + 1j * z / rayleigh_length)
             )
-            * np.exp(-1j * k * ((xx - xshift) ** 2 + (yy - yshift) ** 2) * Rz_inv / 2)
+            * np.exp(-1j * self.k * ((self.X - xshift) ** 2 + (self.Y - yshift) ** 2) * Rz_inv / 2)
         )
-        Hn = self.hermiteH(n, (xx - xshift) / wz)
-        Hm = self.hermiteH(m, (yy - yshift) / wz)
-        return U00 * Hn * Hm * np.exp(-1j * (n + m) * np.arctan(z / zR))
+        Hn = self.hermiteH(n, (self.X - xshift) / wz)
+        Hm = self.hermiteH(m, (self.Y - yshift) / wz)
+        return U00 * Hn * Hm * np.exp(-1j * (n + m) * np.arctan(z / rayleigh_length))
 
 
 # Demonstration of Hermite Gaussian
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
-    PlaneSetUp = [20e-3, 25e-3, 25e-3, 25e-3, 25e-3, 25e-3, 25e-3, 25e-3]
-    Number_Of_Modes = 6
-    InitialBeamWaist = 40e-6
-    HG = HermiteGaussian(PlaneSetUp, Number_Of_Modes)
-    U = HG.makeHG(1, 0, 700e-9, InitialBeamWaist, 0)
+    InitialBeamWaist = 10*40e-6
+    HG = HermiteGaussian()
+    U = HG.makeHG(0, 5, InitialBeamWaist, 0)
     plt.figure()
     plt.title("Intensity")
     plt.pcolor(abs(U) ** 2)
