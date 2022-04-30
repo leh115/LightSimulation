@@ -8,12 +8,14 @@ import cv2
 
 
 class Updater(LightSim):
-    def __init__(self, mask_offset=0.001):
+    def __init__(self, mask_offset=0.001, save_to_file=False):
         super().__init__()
         self.updated_planes = [None] * (len(self.Planes))
         self.analyser = Beam_Analyser()
         self.show_modes_at_start = False
-        self.mask_offset = (np.sqrt(1e-3/(self.Nx*self.Ny)) + 10j*np.sqrt(1e-3/(self.Nx*self.Ny)))
+        self.mask_offset = (1*np.sqrt(1e-3/(self.Nx*self.Ny)) + 2.75j*np.sqrt(1e-3/(self.Nx*self.Ny)))
+        self.save_to_file = save_to_file
+
 
     def UpdatePhasePlane(
         self,
@@ -147,7 +149,7 @@ class Updater(LightSim):
             showAnyProgress (bool, optional): If False, nothing will be shown. Defaults to True.
         """
         visual = Visualiser(
-            show_all_modes=showAllModes, show_Propagation_live=show_Propagation_live
+            show_all_modes=showAllModes, save_to_file = self.save_to_file, show_Propagation_live=show_Propagation_live
         )
 
         if self.show_modes_at_start:
@@ -180,13 +182,54 @@ if __name__ == "__main__":
         (mode_maker.number_of_modes, 1, mode_maker.Nx, mode_maker.Ny),
         dtype=np.complex128,
     )
+    F_modes = np.zeros(
+        (mode_maker.number_of_modes, 1, mode_maker.Nx, mode_maker.Ny),
+        dtype=np.complex128,
+    )
 
     propagator = Propagate(override_dz=True)
+    #For the B field
     for i, mode in enumerate(modes):
         propagator.Beam_Cross_Sections = mode[0]
         propagator >> np.sum(propagator.PlaneSetUp)
+        np.sum(propagator.PlaneSetUp)/2 << propagator
         output_modes[i][0] = propagator.Beam_Cross_Sections[-1]
+    
+    #For the F field
+    for i, mode in enumerate(modes):
+        propagator.Beam_Cross_Sections = mode[0]
+        propagator >> np.sum(propagator.PlaneSetUp)/2
+        F_modes[i][0] = propagator.Beam_Cross_Sections[-1]
+    LightSim.filter_on = False
+    LightSim.ccd_size_factor = 2
+    LightSim.resolution = 1
+    LightSim.number_of_modes = 1
+    z_distance = 20e-3
+    for i in np.linspace(-50,50,10):
+        updater = Updater()
+        updater.mask_offset = (i*1*np.sqrt(1e-3/(updater.Nx*updater.Ny)) + 1j*np.sqrt(1e-3/(updater.Nx*updater.Ny)))
+        updater.UpdatePhasePlane(F_modes[0][0], output_modes[0][0], updater.Planes[0], 0)
+        #* Find the more positive field
+        if np.sum(np.real(F_modes[0][0]))>np.sum(np.real(output_modes[0][0])):
+            more_positive_real = np.sum(np.real(F_modes[0][0]))
+            less_positive_real = np.sum(np.real(output_modes[0][0]))
+        else:
+            more_positive_real = np.sum(np.real(output_modes[0][0]))
+            less_positive_real = np.sum(np.real(F_modes[0][0]))
 
-    updater = Updater()
-    updater.GradientDescent(modes, output_modes, 100, samplingRate=10)
+        if np.sum(np.imag(F_modes[0][0]))>np.sum(np.imag(output_modes[0][0])):
+            more_positive_imag = np.sum(np.imag(F_modes[0][0]))
+            less_positive_imag = np.sum(np.imag(output_modes[0][0]))
+        else:
+            more_positive_imag = np.sum(np.imag(output_modes[0][0]))
+            less_positive_imag = np.sum(np.imag(F_modes[0][0]))
+        
+        less_than_zero = less_positive_imag - np.sum(np.imag(updater.updated_planes[0]))
+        greater_than_zero = more_positive_imag - np.sum(np.imag(updater.updated_planes[0]))
+        less_than_zero_real = less_positive_real - np.sum(np.real(updater.updated_planes[0]))
+        greater_than_zero_real = more_positive_real - np.sum(np.real(updater.updated_planes[0]))
+        print(greater_than_zero - less_than_zero, greater_than_zero_real - less_than_zero_real)
+        
+        
+    #updater.GradientDescent(modes, output_modes, 100, samplingRate=10)
     # conclusion is that once the secondary starts updating itself it initialises its variables and stops checking main anymore: so the warning is to only use the main variable and make sure that secondary is actually updating it.

@@ -2,6 +2,7 @@ import numpy as np
 import cv2
 from LightProp import LightSim
 from Propagate import Propagate
+import os
 
 class Visualiser(LightSim):
     def __init__(self, show_all_modes = False, save_to_file = False, show_Propagation_live = True, show_Planes = False):
@@ -15,7 +16,6 @@ class Visualiser(LightSim):
         self,
         Input,
         Output,
-        showPlanes=False,
     ):
         propagator = Propagate(show_beam=False)
         F = None
@@ -42,87 +42,97 @@ class Visualiser(LightSim):
 
             B[mode] = propagator.Beam_Cross_Sections
 
+        F_intensity = np.abs(F)**2
+        B_intensity = np.abs(B)**2
+
         if self.show_all_modes:
             for m in range(F.shape[0]):
                 self.VisualiseBeam(
-                    F[m],
+                    F_intensity[m],
                     "Beam Cross section A",
                     "Mode %d" % m,
                 )
             for m in range(B.shape[0]):
                 self.VisualiseBeam(
-                    B[m],
+                    B_intensity[m],
                     "Beam Cross section B",
                     "Mode %d" % m,
                 )
        
         self.VisualiseBeam(
-            np.sum(np.abs(F) ** 2, axis=0)*255,
+            np.sum(F_intensity, axis=0)*255,
             "Beam Cross section A",
+            "Superposition",
         )
 
         self.VisualiseBeam(
-            np.sum(np.abs(B) ** 2, axis=0)*255,
+            np.sum(B_intensity, axis=0)*255,
             "Beam Cross section B",
+            "Superposition",
         )
 
         cv2.destroyAllWindows()
 
-    def VisualiseBeam(self, X:np.ndarray, title:str, mode:str=""):
+    def VisualiseBeam(self, X:np.ndarray, title:str, mode:str="", on_white = ""):
         """Turns beam cross sections into true(ish) colour cross secitons and offers ability to save to file
 
         Args:
             X (np.ndarray): shape: (n,X,Y) all of the cross sections
             title (str): Name of the cross sections
             mode (str, optional): Name of the modes. Defaults to "".
+            on_white (str, optional): Defines background colour as black or white. Defaults to black.
         """
        
-        X = self.BeamToRGB(X)
+        X = np.float32(self.BeamToRGB(X))
         
         for part in range(X.shape[0]):
+
+            coloured_image = cv2.cvtColor(np.abs(X[part]), cv2.COLOR_RGB2BGR) / np.max(X[part]) * 255
+            if len(on_white)>0:
+                normed_colour_image = np.sum(coloured_image, axis=2) / np.max(np.sum(coloured_image, axis=2))
+                coloured_image_temp = np.ones(X[part].shape, dtype=np.float32) * 255
+                if on_white == "black":
+                    coloured_image_temp[:,:,0] -= 255*(normed_colour_image)
+                    coloured_image_temp[:,:,1] -= 255*(normed_colour_image)
+                    coloured_image_temp[:,:,2] -= 255*(normed_colour_image)
+                if on_white == "red":
+                    coloured_image_temp[:,:,0] -= 255*(normed_colour_image)
+                    coloured_image_temp[:,:,1] -= 200*(normed_colour_image)
+                    coloured_image_temp[:,:,2] -= 30*(normed_colour_image)
+                if on_white == "green":
+                    coloured_image_temp[:,:,0] -= 250*(normed_colour_image)
+                    coloured_image_temp[:,:,1] -= 80*(normed_colour_image)
+                    coloured_image_temp[:,:,2] -= 255*(normed_colour_image)
+                if on_white == "purple":
+                    coloured_image_temp[:,:,0] -= 100*(normed_colour_image)
+                    coloured_image_temp[:,:,1] -= 255*(normed_colour_image)
+                    coloured_image_temp[:,:,2] -= 100*(normed_colour_image)
+                if on_white == "blue":
+                    coloured_image_temp[:,:,0] -= 100*(normed_colour_image)
+                    coloured_image_temp[:,:,1] -= 100*(normed_colour_image)
+                    coloured_image_temp[:,:,2] -= 255*(normed_colour_image)
+                if on_white == "alpha":
+                    coloured_image_temp = cv2.cvtColor(coloured_image, cv2.COLOR_RGB2RGBA)
+                    coloured_image_temp[:,:,3] = 255 * (normed_colour_image)
+                    
+                
+                coloured_image = coloured_image_temp
+
             if self.show_Propagation_live:
                 cv2.imshow(
                     title,
-                    cv2.cvtColor(np.abs(X[part]).astype(np.float32), cv2.COLOR_RGB2BGR),
+                    coloured_image/255,
                 )
             if self.save_to_file:
-                if len(mode) > 0:
-                    if "Cross section A" in title:
-                        cv2.imwrite(
-                            self.ROOTDIR
-                            + "/Results/ModesA/"
-                            + mode
-                            + " part %d" % part
-                            + ".png",
-                            255
-                            * cv2.cvtColor(
-                                np.abs(X[part]).astype(np.float32), cv2.COLOR_RGB2BGR
-                            ),
-                        )
-                    else:
-                        cv2.imwrite(
-                            self.ROOTDIR
-                            + "/Results/ModesB/"
-                            + mode
-                            + " part %d" % part
-                            + ".png",
-                            255
-                            * cv2.cvtColor(
-                                np.abs(X[part]).astype(np.float32), cv2.COLOR_RGB2BGR
-                            ),
-                        )
-                else:
-                    cv2.imwrite(
-                        self.ROOTDIR
-                        + "/Results/"
-                        + title
-                        + "/Version%d part %d" % (self.VERSION, part)
-                        + ".png",
-                        255
-                        * cv2.cvtColor(
-                            np.abs(X[part]).astype(np.float32), cv2.COLOR_RGB2BGR
-                        ),
-                    )
+                path = os.path.join(self.ROOTDIR, "Results", title, mode)
+                isdir = os.path.isdir(path)
+                if not isdir:
+                    os.makedirs(path)
+                filename = os.path.join(path, f"Version {self.VERSION} part {part}.png")
+                cv2.imwrite(filename,
+                    coloured_image,
+                )
+
             if self.show_Propagation_live:
                 cv2.waitKey(30)
                 cv2.setWindowProperty(title, cv2.WND_PROP_TOPMOST, 1)

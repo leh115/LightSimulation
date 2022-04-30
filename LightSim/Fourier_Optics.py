@@ -2,33 +2,39 @@ from UpdatePlanes import Updater
 from MultiMode import ModePosition as mulmo
 from LightProp import LightSim
 import numpy as np
+import cv2
 
 #* Class variables: LightSim is the underlying class for almost all other classes and so it should be used to update class variables.
 #* Do NOT call <otherclass.classvariable> e.g. updater.dz because the classes that Updater uses will not inherit from it.
 LightSim.dz = 5e-3
-LightSim.kFilter = 1
-LightSim.number_of_modes = 1
+LightSim.kFilter = 0.9
+LightSim.number_of_modes = 25
 LightSim.PlaneSetUp = [20e-3, 25e-3, 25e-3, 25e-3, 25e-3, 25e-3, 25e-3, 25e-3]
-mode_maker = mulmo(Amplitude = 1)
+mode_maker = mulmo(Amplitude = 5)
 
-Initial_Beam_Waist = 30e-6
-Output_Beam_Waist = 2 * Initial_Beam_Waist
-Input_Spot_Separation = np.sqrt(4) * Initial_Beam_Waist
-Output_Spot_Separation = Input_Spot_Separation
+Initial_Beam_Waist = 60e-6
+Output_Beam_Waist = 30e-6
+Input_Spot_Separation = 0 * Initial_Beam_Waist
+Output_Spot_Separation = Output_Beam_Waist * 2
 
 input_modes, output_modes = mode_maker.make_input_output_modes(
     Initial_Beam_Waist,
     Output_Beam_Waist,
     Input_Spot_Separation,
     Output_Spot_Separation,
-    "Square -> Central",
-    "Spot -> HG",
+    "central -> fib",
+    "hg -> spot",
 )
 
-updater = Updater(mask_offset = 0.001)
-updater.show_modes_at_start = False
+#print(output_modes.shape)
+#cv2.imshow("output", np.resize(np.sum(np.abs(output_modes)**2,axis=0),(270,270)).astype(np.float32))
+#for i,mode in enumerate(np.abs(output_modes)**2):
+#    cv2.imshow("mode"+str(i), np.resize( np.abs(output_modes)**2, (270,270)).astype(np.float32))
 
-updater.GradientDescent(input_modes, output_modes, EpochNumber = 100, samplingRate=10, showAllModes=False)
+updater = Updater(save_to_file=True) # mask_offset = 0.001
+updater.show_modes_at_start = True
+
+updater.GradientDescent(input_modes, output_modes, EpochNumber = 1000, samplingRate=10, showAllModes=False)
 
 
 # Notes

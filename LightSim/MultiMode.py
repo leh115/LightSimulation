@@ -194,7 +194,8 @@ class ModePosition(LightSim):
         output_modes = self.makeModes(
             w1, separation1, output_pattern, output_mode_type, start_mode=start_mode
         )
-        for i, mode in enumerate(modes):
+
+        for i, mode in enumerate(output_modes):
             propagator.Beam_Cross_Sections = mode[0]
             propagator >> np.sum(propagator.PlaneSetUp)
             output_modes[i][0] = propagator.Beam_Cross_Sections[-1]

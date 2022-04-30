@@ -11,17 +11,19 @@ class LightSim:
     VERSION = 1
     Variable_Name = ""
     ROOTDIR = "C:/Users/Unimatrix Zero/Documents/Uni Masters/Project/"
-    kFilter = 0.1
+    kFilter = 0.5
     wavelength = 1565e-9
     resolution = 1
     k = 2 * np.pi / wavelength # Wavenumber of light
     dz = 5e-3
-    pixelSize = 8e-6 * 2
-    Nx = int(2.192e-3 / pixelSize) * 2 * resolution
-    Ny = int(2.192e-3 / pixelSize) * 2 * resolution
+    ccd_size_factor = 4
+    pixelSize = 8e-6 * ccd_size_factor
+    Nx = int(2.192e-3 / pixelSize) * ccd_size_factor * resolution
+    Ny = int(2.192e-3 / pixelSize) * ccd_size_factor * resolution
     number_of_modes = 5
     PlaneSetUp = [20e-3, 25e-3, 25e-3, 25e-3, 25e-3, 25e-3, 25e-3, 25e-3]
     phase_plane_components = [1, 0]
+    filter_on = True
 
     def __init__(self):
         
@@ -58,14 +60,16 @@ class LightSim:
                 - (self.vx**2 + self.vy**2) 
             )
         )#.T
+        if self.filter_on:
+            self.Filter = np.array(np.abs(self.Rho < self.kFilter*self.maxRho), dtype=np.float32)
 
     def __repr__(self) -> str:
         return f"<LightSim({self.PlaneSetUp}, {self.number_of_modes}) object>"
 
     def cart2pol(self, x, y):
         rho = np.sqrt(x**2 + y**2)
-        phi = np.arctan2(y, x)
-        return (rho, phi)
+        theta = np.arctan2(y, x)
+        return (theta, rho)
 
     def make_phase_plane(self, re:float = 1, im:float = 0):
         """Generates a complex valued, repeated value phase plane

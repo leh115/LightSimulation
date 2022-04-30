@@ -40,8 +40,9 @@ class Propagate(LightSim):
 
         if not Forwards:
             TransferFunction = TransferFunction.conj()
-
-        # TransferFunction *= self.Rho<self.kFilter*self.maxRho
+            
+        if self.filter_on:
+            TransferFunction *= self.Filter
         num_Counts = abs(int(Distance / dz))
         for c in range(num_Counts):
             # The fourier transform to get to k-space
@@ -61,6 +62,9 @@ class Propagate(LightSim):
                 cv2.waitKey(1)
                 cv2.imshow("Beam Phase", np.angle(self.Beam_Cross_Sections[-1]))
                 cv2.waitKey(1)
+                if self.filter_on:
+                    cv2.imshow("High Frequency Filter", np.expand_dims(self.Filter*255,axis=2))
+                    cv2.waitKey(1)
 
     def PropagatePhasePlane(
         self, Plane: np.ndarray, Forwards: bool = True
@@ -176,15 +180,15 @@ if __name__ == "__main__":
     InitialBeamWaist = 40e-6
     spotSeparation = np.sqrt(4) * InitialBeamWaist
 
-    propagator = Propagate(override_dz=False,show_beam=True)
-    LightSim.number_of_modes = 15
+    propagator = Propagate(override_dz=True,show_beam=False)
+    LightSim.number_of_modes = 20
 
     mode_maker = mulmo(Amplitude = 5)
     Modes = mode_maker.makeModes(
         InitialBeamWaist,
-        spotSeparation*10,
+        0,
         "square",
-        "hg",
+        "hg"
     )
 
     # test_mode = Modes[3][0]
@@ -201,20 +205,23 @@ if __name__ == "__main__":
 
     LightSim.dz /= 10
     #LightSim.wavelength = 380e-9
-    m = 5
+    m = 1
     cv2.imshow("Spirals",  np.real(np.exp(1j * m * spiral)))
     cv2.waitKey(100)
    
     spiral = np.exp(1j * m * spiral)
-    z_dist = 0.02
-    visual = Visualiser(save_to_file=False, show_Propagation_live=True)
+    z_dist = 0.03
+    visual = Visualiser(save_to_file=True, show_Propagation_live=True)
 
     propagator.Beam_Cross_Sections = np.sum(Modes,axis=0)
-    #propagator.Beam_Cross_Sections = np.ones((propagator.Nx, propagator.Ny), dtype=np.complex128)
-    propagator >> 0.01
-    propagator | spiral
-    propagator >> z_dist
-    visual.VisualiseBeam(propagator.Beam_Cross_Sections, "violet2")
+    for mode in Modes:
+        propagator.Beam_Cross_Sections = mode
+        LightSim.VERSION +=1
+        #propagator.Beam_Cross_Sections = np.ones((propagator.Nx, propagator.Ny), dtype=np.complex128)
+        propagator >> 0.05
+        #propagator | spiral
+        #propagator >> z_dist
+        visual.VisualiseBeam(np.abs([propagator.Beam_Cross_Sections[-1]]), "transparent33", on_white="alpha")
     #z_dist << propagator
     #spiral | propagator
     #propagator | spiral

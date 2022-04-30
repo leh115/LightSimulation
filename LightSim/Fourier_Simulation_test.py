@@ -27,6 +27,13 @@ class Test_Simulation(unittest.TestCase):
         "Spot",
     )
 
+    def setUp(self):
+        LightSim.number_of_modes = 5
+        LightSim.kFilter = 1
+        LightSim.filter_on = False # If the filter is on then all reproducible tests will fail
+        LightSim.ccd_size_factor = 2
+        LightSim.resolution = 1
+
     # * Choose a Mode to test
     test_mode1 = Modes[3][0]
 
@@ -39,7 +46,7 @@ class Test_Simulation(unittest.TestCase):
         
         test_mode = self.Modes[0][0]
         propagator = Propagate()
-        z_distance = propagator.dz * 10 # needs to be an integer multiple of dz otherwise override dz will not produce same results
+        z_distance = propagator.dz * 20  # needs to be an integer multiple of dz otherwise override dz will not produce same results
         propagator.Beam_Cross_Sections = test_mode
         propagator >> z_distance
         self.assertGreater(
@@ -53,7 +60,7 @@ class Test_Simulation(unittest.TestCase):
         self.assertEqual(len(propagator2.Beam_Cross_Sections),2)
         self.assertAlmostEqual(np.sum(propagator.Beam_Cross_Sections[-1]), np.sum(propagator2.Beam_Cross_Sections[-1]))
         
-        if z_distance> propagator.dz * 6: # gouy doesn't work for low propagation distances
+        if z_distance> propagator.dz * 19:  # gouy doesn't work for low propagation distances
             #* Now test the Gouy phase shift
             propagator.show_beam = False # otherwise fast flashes
             plane_wave = np.ones((propagator.Nx, propagator.Ny), dtype=np.complex128)
@@ -185,6 +192,7 @@ class Test_Simulation(unittest.TestCase):
         z_distance << propagator1 # and return so that now field is conjugate
         B = propagator1.Beam_Cross_Sections.copy()
         plane_update = Updater()
+        plane_update.mask_offset *= 1
         plane_update.UpdatePhasePlane(F[-1], B[-1], propagator1.Planes[self.test_plane1], self.test_plane1)
 
         #* needs to be pushed to the LightSim class
@@ -215,11 +223,11 @@ class Test_Simulation(unittest.TestCase):
             less_positive_imag = np.sum(np.imag(F))
         
         #* Test now that the new plane is intermediate between the two fields in both real and imaginary components, messages contain mask offset because that's probably why this test will fail
-        self.assertLess(less_positive_real - np.sum(np.real(updated_plane)) , 0, "Mask Offset " + str(plane_update.mask_offset))
-        self.assertGreater(more_positive_real - np.sum(np.real(updated_plane)) , 0, "Mask Offset " + str(plane_update.mask_offset))
+        self.assertLess(less_positive_real - np.sum(np.real(updated_plane)) , 0, "Real too big: Mask Offset " + str(plane_update.mask_offset))
+        self.assertGreater(more_positive_real - np.sum(np.real(updated_plane)) , 0, "Real too small: Mask Offset " + str(plane_update.mask_offset))
 
-        self.assertLess(less_positive_imag - np.sum(np.imag(updated_plane)) , 0, "Mask Offset " + str(plane_update.mask_offset))
-        self.assertGreater(more_positive_imag - np.sum(np.imag(updated_plane)) , 0, "Mask Offset " + str(plane_update.mask_offset))
+        self.assertLess(less_positive_imag - np.sum(np.imag(updated_plane)) , 0, "Imag too big: Mask Offset " + str(plane_update.mask_offset))
+        self.assertGreater(more_positive_imag - np.sum(np.imag(updated_plane)) , 0, "Imag too small: Mask Offset " + str(plane_update.mask_offset))
         
     def test_state_normalisation(self):
         """The maximum value of all of the modes should be 1.
@@ -262,7 +270,7 @@ class Test_Simulation(unittest.TestCase):
         plane_angles =       [[np.random.rand()*2 - 1, np.random.rand()*2 - 1]] # choose some random phase plane
         expected_real =      [np.cos(np.angle(plane_angles[0][0] + 1J*plane_angles[0][1]))]
         expected_imaginary = [np.sin(np.angle(plane_angles[0][0] + 1J*plane_angles[0][1]))]
-
+        
         for plane_angle, eim, ere in zip(plane_angles, expected_imaginary, expected_real):
             for i, number_of_modes, start_mode,  in zip([1,2,3], [1,2,2], [0,1,0]):
                 LightSim.Planes = None
@@ -279,6 +287,7 @@ class Test_Simulation(unittest.TestCase):
                 )
                 updater2 = Updater()
                 updater2.show_modes_at_start = False
+                updater2.mask_offset *= 0
                 mask_offset = updater2.mask_offset.copy()
                 updater2.GradientDescent(input_modes, output_modes, EpochNumber = 1, samplingRate=1, show_Propagation_live=False)
                 Planes.append(LightSim.Planes.copy())
