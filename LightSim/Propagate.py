@@ -37,12 +37,13 @@ class Propagate(LightSim):
             dz = self.dz
 
         TransferFunction = np.exp(-1j * self.bowl * dz)
+        if self.reverse_time:
+            if not Forwards:
+                TransferFunction = TransferFunction.conj()
 
-        if not Forwards:
-            TransferFunction = TransferFunction.conj()
-            
         if self.filter_on:
             TransferFunction *= self.Filter
+            
         num_Counts = abs(int(Distance / dz))
         for c in range(num_Counts):
             # The fourier transform to get to k-space

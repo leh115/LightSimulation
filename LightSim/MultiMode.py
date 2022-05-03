@@ -170,6 +170,7 @@ class ModePosition(LightSim):
         pattern_to_pattern: str,
         mode_type_to_mode_type: str,
         start_mode: int = 0,
+        propagate_to_output = True,
     ) -> list:
         """Parses a string to generate input and output modes
 
@@ -194,11 +195,11 @@ class ModePosition(LightSim):
         output_modes = self.makeModes(
             w1, separation1, output_pattern, output_mode_type, start_mode=start_mode
         )
-
-        for i, mode in enumerate(output_modes):
-            propagator.Beam_Cross_Sections = mode[0]
-            propagator >> np.sum(propagator.PlaneSetUp)
-            output_modes[i][0] = propagator.Beam_Cross_Sections[-1]
+        if propagate_to_output:
+            for i, mode in enumerate(output_modes):
+                propagator.Beam_Cross_Sections = mode[0]
+                propagator >> np.sum(propagator.PlaneSetUp)
+                output_modes[i][0] = propagator.Beam_Cross_Sections[-1]
 
         return [modes, output_modes]
 
@@ -207,15 +208,18 @@ if __name__ == "__main__":
     LightSim.number_of_modes = 30
     mode_maker = ModePosition(Amplitude=1)
     # mode_maker.make_input_output_modes(1,1,1,1,"Fib -> Square","Spot -> HG")
-    mode_maker.make_input_output_modes(
+    input,out =mode_maker.make_input_output_modes(
         30e-6,
         30e-6,
         120e-6,
         120e-6,
         "left_right -> left_right",
         "spot -> spot",
-        start_mode=1,
+        start_mode=0,
     )
+    cv2.imshow("Modes", np.sum(np.abs(input), axis=0)[0])
+        # cv2.imwrite("C:/Users/Unimatrix Zero/Documents/Uni Masters/Project/Figures and Demos/Mode Positions.png",255*np.sum(np.abs(M),axis=0)[0])
+    cv2.waitKey(0)
     for i in range(mode_maker.number_of_modes):
         LightSim.number_of_modes = 30
         M = mode_maker.makeModes(

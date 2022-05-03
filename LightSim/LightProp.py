@@ -24,6 +24,8 @@ class LightSim:
     PlaneSetUp = [20e-3, 25e-3, 25e-3, 25e-3, 25e-3, 25e-3, 25e-3, 25e-3]
     phase_plane_components = [1, 0]
     filter_on = True
+    reverse_time = True
+    make_windows_top = True
 
     def __init__(self):
         
