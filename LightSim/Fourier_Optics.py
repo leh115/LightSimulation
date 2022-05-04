@@ -13,7 +13,7 @@ for version_number, sep_factor in enumerate([1]):#np.linspace(1,20,10)):
     LightSim.PlaneSetUp = [20e-3, 25e-3, 25e-3, 25e-3, 25e-3, 25e-3, 25e-3, 25e-3]
     LightSim.reverse_time = False
     LightSim.make_windows_top = False
-    LightSim.VERSION = 1010 + version_number
+    LightSim.VERSION = 1009 + version_number
     mode_maker = mulmo(Amplitude=10)
 
     Initial_Beam_Waist = 60e-6
