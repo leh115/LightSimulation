@@ -61,7 +61,7 @@ class Updater(LightSim):
             )
 
     def Update_All_Planes(
-        self, Input: np.ndarray, Output: np.ndarray, showPrePostPlane: bool = False
+        self, Input: np.ndarray, Output: np.ndarray, showPrePostPlane: bool = False, collect_probabilities: bool = False,
     ):
         """Propagates Backwards and Forwards through whole system once with all modes and updates the phase planes
 
@@ -94,9 +94,9 @@ class Updater(LightSim):
                     Forwards_propagator.Beam_Cross_Sections[-1],
                 )
             )
-
-            #* collect the conditional probability for every output mode compared against all of the input modes
-            self.analyser.conditional_probability_matrix(Input[:,0,:,:], Backwards_propagator.Beam_Cross_Sections[-1], mode)
+            if collect_probabilities:
+                #* collect the conditional probability for every output mode compared against all of the input modes
+                self.analyser.conditional_probability_matrix(Input[:,0,:,:], Backwards_propagator.Beam_Cross_Sections[-1], mode)
 
             for i, F in enumerate(Forwards_propagator.Beam_Cross_Sections):
                 # * Phase planes are at even indices. The first even index (0) is not a phase plane, its the initial beam
@@ -182,15 +182,18 @@ class Updater(LightSim):
             In = Input.copy()
             Out = Output.copy()
 
-            self.Update_All_Planes(
-                In, Out, showPrePostPlane=False
-            )  # Correct for all of the planes
-
             print("Epoch: %d" % (GradDescent))
 
             if GradDescent % samplingRate == 0:
+                self.Update_All_Planes(
+                In, Out, showPrePostPlane=False, collect_probabilities=True
+                )  # Correct for all of the planes
                 visual.showProgress(In, Out, self.mask_offset)
                 self.analyser.show_conditional_probability_matrix()
+            else:
+                self.Update_All_Planes(
+                In, Out, showPrePostPlane=False
+                )  # Correct for all of the planes
 
 
 if __name__ == "__main__":

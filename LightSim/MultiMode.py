@@ -205,28 +205,28 @@ class ModePosition(LightSim):
 
 
 if __name__ == "__main__":
-    LightSim.number_of_modes = 30
+    from Visualiser import Visualiser
+    visual = Visualiser(save_to_file=True)
+    LightSim.number_of_modes = 121
+    LightSim.VERSION = 14
     mode_maker = ModePosition(Amplitude=1)
-    # mode_maker.make_input_output_modes(1,1,1,1,"Fib -> Square","Spot -> HG")
-    input,out =mode_maker.make_input_output_modes(
+    input, out =mode_maker.make_input_output_modes(
+        60e-6,
         30e-6,
-        30e-6,
+        2*120e-6,
         120e-6,
-        120e-6,
-        "left_right -> left_right",
-        "spot -> spot",
+        "fib -> left_right",
+        "hg -> spot",
         start_mode=0,
     )
-    cv2.imshow("Modes", np.sum(np.abs(input), axis=0)[0])
-        # cv2.imwrite("C:/Users/Unimatrix Zero/Documents/Uni Masters/Project/Figures and Demos/Mode Positions.png",255*np.sum(np.abs(M),axis=0)[0])
+    visual.VisualiseBeam(np.sum(np.abs(input**2),axis=0), "Position styles", on_white="alpha")
     cv2.waitKey(0)
-    for i in range(mode_maker.number_of_modes):
-        LightSim.number_of_modes = 30
-        M = mode_maker.makeModes(
-            20e-6, np.sqrt(3) * 60e-6, "inv_square", "HG", start_mode=i
-        )
+    #* code for an animation of the number of modes increasing, showing scalable design.
+    # for i in range(mode_maker.number_of_modes):
+    #     LightSim.number_of_modes = 30
+    #     M = mode_maker.makeModes(
+    #         20e-6, np.sqrt(3) * 60e-6, "square", "HG", start_mode=i
+    #     )
 
-        cv2.imshow("Modes", np.sum(np.abs(M), axis=0)[0])
-        # cv2.imwrite("C:/Users/Unimatrix Zero/Documents/Uni Masters/Project/Figures and Demos/Mode Positions.png",255*np.sum(np.abs(M),axis=0)[0])
-        cv2.waitKey(100)
-    print(mode_maker.combinationsUptoN(5, modesOnly=True))
+    #     cv2.imshow("Modes", np.sum(np.abs(M), axis=0)[0])
+    #     cv2.waitKey(100)

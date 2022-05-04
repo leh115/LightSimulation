@@ -38,7 +38,6 @@ class Visualiser(LightSim):
         self.show_phase = show_phase
         self.save_last_only = save_last_only
         self.show_loss = show_loss
-        
 
     def showProgress(
         self,
@@ -87,51 +86,52 @@ class Visualiser(LightSim):
 
             B[mode] = propagator.Beam_Cross_Sections
 
-        F_intensity = np.abs(F) ** 2
-        B_intensity = np.abs(B) ** 2
+        F_intensities = np.abs(F) ** 2
+        B_intensities = np.abs(B) ** 2
 
-        F_Phase = np.angle(F)
-        B_Phase = np.angle(B)
+        F_Phases = np.angle(F)
+        B_Phases = np.angle(B)
 
         if self.show_all_modes:
-            for m in range(F.shape[0]):
+            #for m in range(F.shape[0]):
+            for mode_index, F_intensity, B_intensity, F_Phase, B_Phase in zip(range(self.number_of_modes), F_intensities, B_intensities, F_Phases, B_Phases):
                 self.VisualiseBeam(
-                    F_intensity[m],
+                    F_intensity,
                     "Beam Cross section A",
-                    "Mode %d" % m,
+                    "Mode %d" % mode_index,
                     on_white="alpha",
                 )
                 self.VisualiseBeam(
-                    B_intensity[m],
+                    B_intensity,
                     "Beam Cross section B",
-                    "Mode %d" % m,
+                    "Mode %d" % mode_index,
                     on_white="alpha",
                 )
                 if self.show_phase:
                     self.VisualiseBeam(
-                        F_intensity[m],
+                        F_intensity,
                         "Beam Cross section A",
-                        "Mode Phase %d" % m,
-                        phase=F_Phase[m],
+                        "Mode Phase %d" % mode_index,
+                        phase=F_Phase,
                         on_white="alpha",
                     )
                     self.VisualiseBeam(
-                        B_intensity[m],
+                        B_intensity,
                         "Beam Cross section B",
-                        "Mode Phase %d" % m,
-                        phase=B_Phase[m],
+                        "Mode Phase %d" % mode_index,
+                        phase=B_Phase,
                         on_white="alpha",
                     )
 
         self.VisualiseBeam(
-            np.sum(F_intensity, axis=0) * 255,
+            np.sum(F_intensities, axis=0) * 255,
             "Beam Cross section A",
             "Superposition",
             on_white="alpha",
         )
 
         self.VisualiseBeam(
-            np.sum(B_intensity, axis=0) * 255,
+            np.sum(B_intensities, axis=0) * 255,
             "Beam Cross section B",
             "Superposition",
             on_white="alpha",
@@ -141,7 +141,7 @@ class Visualiser(LightSim):
             self.visualise_Planes()
         
         if self.show_loss:
-            self.show_loss_graph(F_intensity)
+            self.show_loss_graph(F_intensities)
         
         self.show_phasor(np.sum(B, axis=0),np.sum(F, axis=0),mask_offset,legend=["Backward propagation","Forward propagation","Mask Offset"])
 
@@ -326,24 +326,24 @@ class Visualiser(LightSim):
         if len(X.shape) == 3:
             X = np.expand_dims(X, axis=3)
             X = np.concatenate((X, X, X), axis=3)
-            X[:, :, :, 0] = X[:, :, :, 0] * pseudoColour[0] / 255
-            X[:, :, :, 1] = X[:, :, :, 1] * pseudoColour[1] / 255
-            X[:, :, :, 2] = X[:, :, :, 2] * pseudoColour[2] / 255
+            X[:, :, :, 0] *= pseudoColour[0] / 255
+            X[:, :, :, 1] *= pseudoColour[1] / 255
+            X[:, :, :, 2] *= pseudoColour[2] / 255
         elif len(X.shape) == 4:
             X = np.expand_dims(X, axis=4)
             X = np.concatenate((X, X, X), axis=4)
-            X[:, :, :, :, 0] = X[:, :, :, :, 0] * pseudoColour[0] / 255
-            X[:, :, :, :, 1] = X[:, :, :, :, 1] * pseudoColour[1] / 255
-            X[:, :, :, :, 2] = X[:, :, :, :, 2] * pseudoColour[2] / 255
+            X[:, :, :, :, 0] *= pseudoColour[0] / 255
+            X[:, :, :, :, 1] *= pseudoColour[1] / 255
+            X[:, :, :, :, 2] *= pseudoColour[2] / 255
         return X
 
     def PhaseToRGB(self, X: np.ndarray, phase):
         if len(X.shape) == 3:
             X = np.expand_dims(X, axis=3)
             X = np.concatenate((X, X, X), axis=3)
-            X[:, :, :, 0] = X[:, :, :, 0] * phase / 255
-            X[:, :, :, 1] = X[:, :, :, 1] * (1 - phase) / 255
-            X[:, :, :, 2] = X[:, :, :, 2] * 0 / 255
+            X[:, :, :, 0] *= phase / 255
+            X[:, :, :, 1] *= (1 - phase) / 255
+            X[:, :, :, 2] *= 0 / 255
         return X
 
     def show_Initial(self, In, Out, wait_value=0):
@@ -378,8 +378,6 @@ class Visualiser(LightSim):
 
         def convert_polar_xticks_to_radians(ax):
             """This function, was slightly modified from an answer found on https://stackoverflow.com/questions/21172228/python-matplotlib-polar-plots-with-angular-labels-in-radians"""
-            # Converts x-tick labels from degrees to radians
-
             # Get the x-tick positions (returns in radians)
             label_positions = ax.get_xticks()
 
@@ -393,15 +391,12 @@ class Visualiser(LightSim):
         
         
         good_colours = Beam_Analyser.modeColours
-        #if isinstance(single_values,list):
         fig = plt.figure()
         if animate == True:
             steps = len(phases[0])
         else:
             steps = 1
         for z in range(steps):
-            #plt.close()
-            
             ax = fig.add_axes([0.1, 0.1, 0.8, 0.8], polar=True)
             convert_polar_xticks_to_radians(ax)
             plt.grid(True)
@@ -420,13 +415,10 @@ class Visualiser(LightSim):
                 else:
                     this_phase = phase
                 plt.arrow(
-                    #np.angle(np.sum(this_phase)),
                     np.angle(np.sum(this_phase)),
                     0,
                     0,
                     1,
-                    #np.abs(np.max(phase)/overall_max),
-                    #alpha=1,
                     width=0.03,
                     edgecolor=None,
                     facecolor=good_colours[i],
@@ -448,4 +440,4 @@ class Visualiser(LightSim):
 
 if __name__ == "__main__":
     visual = Visualiser()
-    visual.show_phasor(0.1 + 1j, -1 - 0.1j, [0.1+ 1j, -1 - 0.1j],legend=["B","F","MO"])
+    visual.show_phasor(0.1 + 1j, -1 - 0.1j, [0.1+ 1j, -1 - 0.1j], legend=["Example complex 1","Example complex 2","Example complex list"])

@@ -101,6 +101,7 @@ class Beam_Analyser(LightSim):
             for i in range(X.shape[1]):
                 CoMy += np.sum(np.abs(np.real(X[:, i] * list(range(X.shape[0])))))
                 ySum += np.sum(np.abs(np.real(X[:, i])))
+            
             return [CoMx / xSum, CoMy / ySum]
         except:
             return [0, 0]
@@ -220,7 +221,7 @@ class Beam_Analyser(LightSim):
         theory_wz = self.Theoretical_BeamWaist(initial_beam_waist, z)
         return [sim_wz, theory_wz]
 
-    def conditional_probability_matrix(self, desired_modes:np.ndarray, actual_modes:np.ndarray, mode_number:int) -> np.ndarray:
+    def conditional_probability_matrix(self, desired_modes:np.ndarray, actual_mode:np.ndarray, actual_mode_number:int) -> np.ndarray:
         """Takes in two sets of modes and compares each mode in one set to the whole of the other.
 
         Args:
@@ -230,12 +231,23 @@ class Beam_Analyser(LightSim):
         Updates:
             np.ndarray: The conditional probability matrix for this instance
         """
-        self.conditional_matrix[mode_number,:] = np.sum(abs(desired_modes**2) - abs(actual_modes**2))
+        desired_mode_intensities = abs(desired_modes**2)
+        actual_mode_intensity =  abs(actual_mode**2)
+        for desired_mode_number, desired_mode_intensity in enumerate(desired_mode_intensities):
+            #print(np.max(actual_mode_intensity))
+            X,Y = np.array(self.CentreOfMass(desired_mode_intensity), dtype=np.int32 )
+            box_size = 4
+            bounded_DMI = desired_mode_intensity[Y-box_size+1:Y+box_size+1,X-box_size+1:X+box_size]
+            bounded_AMI = actual_mode_intensity[Y-box_size+1:Y+box_size+1,X-box_size+1:X+box_size]
+            conditional_vector = np.abs( np.sum(bounded_DMI/np.max(bounded_DMI) - bounded_AMI/np.max(bounded_AMI)) )
+            self.conditional_matrix[actual_mode_number, desired_mode_number] = -conditional_vector # smallest difference is best
        
 
     def show_conditional_probability_matrix(self):
         fig = plt.figure()
-        plt.imshow(self.conditional_matrix)
+        plt.imshow(self.conditional_matrix/np.abs(np.max(self.conditional_matrix)), extent=[0.5,self.number_of_modes + 0.5, 0.5, self.number_of_modes + 0.5])
+        #ax = plt.gca()
+        #ax.set_xlabel([1,self.number_of_modes+1])
         plt.xlabel("Predicted modes")
         plt.ylabel("Actual modes")
         plt.title("Conditional Probability Matrix")

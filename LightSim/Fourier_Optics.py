@@ -13,7 +13,7 @@ for version_number, sep_factor in enumerate([1]):#np.linspace(1,20,10)):
     LightSim.PlaneSetUp = [20e-3, 25e-3, 25e-3, 25e-3, 25e-3, 25e-3, 25e-3, 25e-3]
     LightSim.reverse_time = False
     LightSim.make_windows_top = False
-    LightSim.VERSION = 1007 + version_number
+    LightSim.VERSION = 1009 + version_number
     mode_maker = mulmo(Amplitude=10)
 
     Initial_Beam_Waist = 60e-6
@@ -46,38 +46,6 @@ for version_number, sep_factor in enumerate([1]):#np.linspace(1,20,10)):
         save_last_only=False,
         show_loss=False,
     )
-    # updater.mask_offset *= 4 / 3.5 
-    # updater.GradientDescent(
-    #     input_modes,
-    #     output_modes,
-    #     EpochNumber=20,
-    #     samplingRate=100,
-    #     showAllModes=False,
-    #     show_phase=False,
-    #     save_last_only=True,
-    # )
-    # updater.mask_offset *= 4.25 / 4
-    # updater.GradientDescent(
-    #     input_modes,
-    #     output_modes,
-    #     EpochNumber=30,
-    #     samplingRate=30-1,
-    #     showAllModes=True,
-    #     show_phase=True,
-    #     save_last_only=True,
-    #     show_Propagation_live=True,
-    # )
-    # updater.mask_offset *= 4.5 / 4#.25
-    # updater.GradientDescent(
-    #     input_modes,
-    #     output_modes,
-    #     EpochNumber=20,
-    #     samplingRate=20 - 1,
-    #     showAllModes=True,
-    #     show_phase=True,
-    #     save_last_only=True,
-    #     show_planes=True,
-    # )
 
 
 # Notes

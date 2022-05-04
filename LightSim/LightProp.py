@@ -11,12 +11,12 @@ class LightSim:
     VERSION = 1
     Variable_Name = ""
     ROOTDIR = "C:/Users/Unimatrix Zero/Documents/Uni Masters/Project/"
-    kFilter = 0.5
+    kFilter = 1
     wavelength = 1565e-9
-    resolution = 1
+    resolution = 2
     k = 2 * np.pi / wavelength # Wavenumber of light
     dz = 5e-3
-    ccd_size_factor = 4
+    ccd_size_factor = 3
     pixelSize = 8e-6 * ccd_size_factor
     Nx = int(2.192e-3 / pixelSize) * ccd_size_factor * resolution
     Ny = int(2.192e-3 / pixelSize) * ccd_size_factor * resolution
