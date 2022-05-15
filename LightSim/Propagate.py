@@ -36,36 +36,31 @@ class Propagate(LightSim):
         else:
             dz = self.dz
 
-        TransferFunction = np.exp(-1j * self.bowl * dz)
+        dzs = np.ones((len(np.arange(0, Distance+dz, dz)), self.Nx, self.Ny)) * np.expand_dims( np.arange(0, Distance+dz, dz) ,(1,2))        
+        TransferFunction = np.exp(-1j * dzs * np.expand_dims(self.bowl, 0))
+
         if self.reverse_time:
             if not Forwards:
                 TransferFunction = TransferFunction.conj()
 
         if self.filter_on:
-            TransferFunction *= self.Filter
-            
-        num_Counts = abs(int(Distance / dz))
-        for c in range(num_Counts):
-            # The fourier transform to get to k-space
-            F = sfft.fft2(self.Beam_Cross_Sections[-1])
-            F = sfft.fftshift(F)
+            TransferFunction = TransferFunction * np.expand_dims(self.Filter, 0)
 
-            # Applying the propagation multiplication to the fourier space
-            KF = F * TransferFunction  # applying the transfer function
+        # The fourier transform to get to k-space
+        F = sfft.fft2(self.Beam_Cross_Sections[-1])
+        F = sfft.fftshift(F)
+        # Applying the propagation multiplication to the fourier space
+        KF = TransferFunction * np.expand_dims(F, 0)  # applying the transfer function
+        # Inversing the result to get back to real space
+        self.Beam_Cross_Sections = np.append(
+            self.Beam_Cross_Sections, np.fft.ifft2(KF), axis=0
+        )
+        if self.show_beam:
+            cv2.imshow("Beam Cross section", np.abs(self.Beam_Cross_Sections[-1])**2)
+            cv2.waitKey(50)
+            cv2.imshow("Beam Phase", np.angle(self.Beam_Cross_Sections[-1]))
+            cv2.waitKey(50)
 
-            # Inversing the result to get back to real space
-            self.Beam_Cross_Sections = np.append(
-                self.Beam_Cross_Sections, [np.fft.ifft2(sfft.fftshift(KF))], axis=0
-            )
-
-            if self.show_beam:
-                cv2.imshow("Beam Cross section", np.abs(self.Beam_Cross_Sections[-1]))
-                cv2.waitKey(1)
-                cv2.imshow("Beam Phase", np.angle(self.Beam_Cross_Sections[-1]))
-                cv2.waitKey(1)
-                if self.filter_on:
-                    cv2.imshow("High Frequency Filter", np.expand_dims(self.Filter*255,axis=2))
-                    cv2.waitKey(1)
 
     def PropagatePhasePlane(
         self, Plane: np.ndarray, Forwards: bool = True
@@ -180,7 +175,6 @@ if __name__ == "__main__":
     from Visualiser import Visualiser
     InitialBeamWaist = 40e-6
     spotSeparation = np.sqrt(4) * InitialBeamWaist
-
     propagator = Propagate(override_dz=True,show_beam=False)
     LightSim.number_of_modes = 20
 
@@ -191,6 +185,7 @@ if __name__ == "__main__":
         "square",
         "hg"
     )
+    
 
     # test_mode = Modes[3][0]
     # propagator.Beam_Cross_Sections = test_mode
@@ -205,15 +200,19 @@ if __name__ == "__main__":
     cv2.waitKey(100)
 
     LightSim.dz /= 10
-    #LightSim.wavelength = 380e-9
     m = 1
     cv2.imshow("Spirals",  np.real(np.exp(1j * m * spiral)))
     cv2.waitKey(100)
-   
+    
     spiral = np.exp(1j * m * spiral)
     z_dist = 0.03
-    visual = Visualiser(save_to_file=True, show_Propagation_live=True)
+    visual = Visualiser(save_to_file=False, show_Propagation_live=True)
+    old_times = []
+    propagator.Beam_Cross_Sections = Modes[1]
+    propagator >> 0.1
 
+    visual.VisualiseBeam(np.abs(propagator.Beam_Cross_Sections)**2, "Testing")
+    
     propagator.Beam_Cross_Sections = np.sum(Modes,axis=0)
     for mode in Modes:
         propagator.Beam_Cross_Sections = mode

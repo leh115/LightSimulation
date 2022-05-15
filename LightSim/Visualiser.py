@@ -171,7 +171,6 @@ class Visualiser(LightSim):
             X = np.float32(self.PhaseToRGB(X, phase))
         animation_length = X.shape[0]
         for i, part in enumerate(range(animation_length)):
-
             coloured_image = (
                 cv2.cvtColor(np.abs(X[part]), cv2.COLOR_RGB2BGR) / np.max(X[part]) * 255
             )

@@ -236,7 +236,7 @@ class Beam_Analyser(LightSim):
         for desired_mode_number, desired_mode_intensity in enumerate(desired_mode_intensities):
             #print(np.max(actual_mode_intensity))
             X,Y = np.array(self.CentreOfMass(desired_mode_intensity), dtype=np.int32 )
-            box_size = 4
+            box_size = 2
             bounded_DMI = desired_mode_intensity[Y-box_size+1:Y+box_size+1,X-box_size+1:X+box_size]
             bounded_AMI = actual_mode_intensity[Y-box_size+1:Y+box_size+1,X-box_size+1:X+box_size]
             conditional_vector = np.abs( np.sum(bounded_DMI/np.max(bounded_DMI) - bounded_AMI/np.max(bounded_AMI)) )
@@ -246,6 +246,15 @@ class Beam_Analyser(LightSim):
     def show_conditional_probability_matrix(self):
         fig = plt.figure()
         plt.imshow(self.conditional_matrix/np.abs(np.max(self.conditional_matrix)), extent=[0.5,self.number_of_modes + 0.5, 0.5, self.number_of_modes + 0.5])
+        #ax = plt.gca()
+        #ax.set_xlabel([1,self.number_of_modes+1])
+        plt.xlabel("Predicted modes")
+        plt.ylabel("Actual modes")
+        plt.title("Conditional Probability Matrix")
+        plt.show()
+
+        fig = plt.figure()
+        plt.imshow(self.conditional_matrix, extent=[0.5,self.number_of_modes + 0.5, 0.5, self.number_of_modes + 0.5])
         #ax = plt.gca()
         #ax.set_xlabel([1,self.number_of_modes+1])
         plt.xlabel("Predicted modes")

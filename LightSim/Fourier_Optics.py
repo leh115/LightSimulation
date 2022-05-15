@@ -32,17 +32,17 @@ for version_number, sep_factor in enumerate([1]):#np.linspace(1,20,10)):
     )
 
     updater = Updater(save_to_file=False)
-    updater.mask_offset = ( np.sqrt(137) / np.sqrt(0**2 + 1**2) ) * ( 0*np.sqrt(1e-3 / (updater.Nx * updater.Ny)) + 1*1j * np.sqrt(1e-3 / (updater.Nx * updater.Ny)) )
+    updater.mask_offset = ( np.sqrt(137) / np.sqrt(0**2 + 1**2) ) * ( 0*np.sqrt(1e-3 / (updater.Nx * updater.Ny)) + 1*1j * np.sqrt(1e-3 / (updater.Nx * updater.Ny)) ) 
     updater.show_modes_at_start = False
 
     updater.GradientDescent(
         input_modes,
         output_modes,
-        EpochNumber=350,
-        samplingRate=350-1,
-        showAllModes=False,
+        EpochNumber=1050,
+        samplingRate=1050-1,
+        showAllModes=True,
         show_phase=True,
-        show_Propagation_live=False,
+        show_Propagation_live=True,
         save_last_only=False,
         show_loss=False,
     )

@@ -207,7 +207,7 @@ class ModePosition(LightSim):
 if __name__ == "__main__":
     from Visualiser import Visualiser
     visual = Visualiser(save_to_file=True)
-    LightSim.number_of_modes = 121
+    LightSim.number_of_modes = 5
     LightSim.VERSION = 14
     mode_maker = ModePosition(Amplitude=1)
     input, out =mode_maker.make_input_output_modes(
