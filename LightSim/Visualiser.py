@@ -49,7 +49,7 @@ class Visualiser(LightSim):
         F = None
         B = None
         for mode in range(Input.shape[0]):
-            propagator.Beam_Cross_Sections = Input[mode]
+            propagator[:] = Input[mode]
 
             propagator.Propagate_FromPlane_ToPlane(
                 0,
@@ -59,7 +59,7 @@ class Visualiser(LightSim):
                 F = np.zeros(
                     (
                         self.number_of_modes,
-                        len(propagator.Beam_Cross_Sections),
+                        len(propagator[:]),
                         self.Nx,
                         self.Ny,
                     ),
@@ -68,23 +68,23 @@ class Visualiser(LightSim):
                 B = np.zeros(
                     (
                         self.number_of_modes,
-                        len(propagator.Beam_Cross_Sections),
+                        len(propagator[:]),
                         self.Nx,
                         self.Ny,
                     ),
                     dtype=np.complex128,
                 )
 
-            F[mode] = propagator.Beam_Cross_Sections
+            F[mode] = propagator[:]
 
-            propagator.Beam_Cross_Sections = Output[mode]
+            propagator[:] = Output[mode]
             propagator.Propagate_FromPlane_ToPlane(
                 0,
                 len(self.PlaneSetUp),
                 Forwards=False,
             )
 
-            B[mode] = propagator.Beam_Cross_Sections
+            B[mode] = propagator[:]
 
         F_intensities = np.abs(F) ** 2
         B_intensities = np.abs(B) ** 2

@@ -284,9 +284,9 @@ if __name__ == "__main__":
     step_size = 0.00043*2
     for i in range(400):
         z = 0.01 + step_size * i
-        propagator.Beam_Cross_Sections = single_mode
+        propagator[:] = single_mode
         propagator >> z
-        X = propagator.Beam_Cross_Sections[-1]
+        X = propagator[-1]
         sim_wz, theory_wz = analyser.w0_theory_vs_sim(X, z, w0)
         plt.scatter(z, theory_wz*1000, color="green",marker="o",alpha=0.3,linewidth=0)
         plt.scatter(z, sim_wz*1000, color="yellow",marker=".")
@@ -299,9 +299,9 @@ if __name__ == "__main__":
         differences.append(theory_wz - sim_wz)
         factor_difference.append(theory_wz / sim_wz)
         propagator.Filter = np.array(np.abs(propagator.Rho < 0.36*propagator.maxRho), dtype=np.float32)
-        propagator.Beam_Cross_Sections = single_mode
+        propagator[:] = single_mode
         propagator >> z
-        X = propagator.Beam_Cross_Sections[-1]
+        X = propagator[-1]
         sim_wz_filter = analyser.beam_width(X, style="one_over_e_squared")
         plt.scatter(z, sim_wz_filter*1000, color="red", marker=".")
         propagator.Filter = np.array(np.abs(propagator.Rho < 1*propagator.maxRho), dtype=np.float32)

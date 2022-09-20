@@ -78,8 +78,8 @@ class Updater(LightSim):
         self.updated_planes = [None] * (len(self.Planes))
         for mode in range(Input.shape[0]):
 
-            Forwards_propagator.Beam_Cross_Sections = Input[mode]
-            Backwards_propagator.Beam_Cross_Sections = Output[mode]
+            Forwards_propagator[:] = Input[mode]
+            Backwards_propagator[:] = Output[mode]
 
             Forwards_propagator.Propagate_FromPlane_ToPlane(0, len(self.PlaneSetUp))
 
@@ -90,21 +90,20 @@ class Updater(LightSim):
             # * compares the centre of mass of desired output modes (not propagated) and the actual output modes (propagated from start to finish)
             modeCentreDifferences.append(
                 self.analyser.Centre_difference(
-                    Backwards_propagator.Beam_Cross_Sections[0],
-                    Forwards_propagator.Beam_Cross_Sections[-1],
+                    Backwards_propagator[0],
+                    Forwards_propagator[-1],
                 )
             )
             if collect_probabilities:
                 #* collect the conditional probability for every output mode compared against all of the input modes
-                self.analyser.conditional_probability_matrix(Input[:,0,:,:], Backwards_propagator.Beam_Cross_Sections[-1], mode)
-
-            for i, F in enumerate(Forwards_propagator.Beam_Cross_Sections):
+                self.analyser.conditional_probability_matrix(Input[:,0,:,:], Backwards_propagator[-1], mode)
+            for i, F in enumerate(Forwards_propagator[:]):
                 # * Phase planes are at even indices. The first even index (0) is not a phase plane, its the initial beam
                 if i > 0:
                     if i % 2 == 0:
 
                         plane_number = i // 2 - 1
-                        B = Backwards_propagator.Beam_Cross_Sections[-i]
+                        B = Backwards_propagator[-i]
 
                         [
                             Coupling_Matrix[mode],
@@ -174,7 +173,7 @@ class Updater(LightSim):
             show_Planes=show_planes,
             show_loss = show_loss,
         )
-
+        conditional_probabilities = False
         if self.show_modes_at_start:
             visual.show_Initial(Input, Output)
 
@@ -186,10 +185,11 @@ class Updater(LightSim):
 
             if GradDescent % samplingRate == 0:
                 self.Update_All_Planes(
-                In, Out, showPrePostPlane=False, collect_probabilities=True
+                In, Out, showPrePostPlane=False, collect_probabilities=conditional_probabilities
                 )  # Correct for all of the planes
                 visual.showProgress(In, Out, self.mask_offset)
-                self.analyser.show_conditional_probability_matrix()
+                if conditional_probabilities:
+                    self.analyser.show_conditional_probability_matrix()
             else:
                 self.Update_All_Planes(
                 In, Out, showPrePostPlane=False
@@ -217,16 +217,16 @@ if __name__ == "__main__":
     propagator = Propagate(override_dz=True)
     # For the B field
     for i, mode in enumerate(modes):
-        propagator.Beam_Cross_Sections = mode[0]
+        propagator[:] = mode[0]
         propagator >> np.sum(propagator.PlaneSetUp)
         np.sum(propagator.PlaneSetUp) / 2 << propagator
-        output_modes[i][0] = propagator.Beam_Cross_Sections[-1]
+        output_modes[i][0] = propagator[-1]
 
     # For the F field
     for i, mode in enumerate(modes):
-        propagator.Beam_Cross_Sections = mode[0]
+        propagator[:] = mode[0]
         propagator >> np.sum(propagator.PlaneSetUp) / 2
-        F_modes[i][0] = propagator.Beam_Cross_Sections[-1]
+        F_modes[i][0] = propagator[-1]
     LightSim.filter_on = False
     LightSim.ccd_size_factor = 2
     LightSim.resolution = 1
@@ -240,7 +240,7 @@ if __name__ == "__main__":
         updater.UpdatePhasePlane(
             F_modes[0][0], output_modes[0][0], updater.Planes[0], 0
         )
-        # * Find the more positive field
+        #* Find the more positive field
         if np.sum(np.real(F_modes[0][0])) > np.sum(np.real(output_modes[0][0])):
             more_positive_real = np.sum(np.real(F_modes[0][0]))
             less_positive_real = np.sum(np.real(output_modes[0][0]))

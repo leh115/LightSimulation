@@ -3,8 +3,6 @@ import cv2
 import scipy.fftpack as sfft
 from LightProp import LightSim
 
-
-
 class Propagate(LightSim):
     def __init__(self, override_dz=False, show_beam=True):
         super().__init__()
@@ -12,6 +10,7 @@ class Propagate(LightSim):
         self.override_dz = override_dz
         self.show_beam = show_beam
 
+    #TODO make matrix handle modes too
     def PropagateFreeSpace(
         self,
         Distance=0.1,
@@ -23,20 +22,19 @@ class Propagate(LightSim):
             Distance (float): The total distance to travel in the z direction. Defaults to 0.1.
             showBeam (bool): Defaults to True.
             Forwards (bool): Denotes direction of propagation. Defaults to True.
-
-        Returns:
-            _type_: _description_
         """
-        if not isinstance(self.Beam_Cross_Sections, list):
-            if len(self.Beam_Cross_Sections.shape) == 2:
-                self.Beam_Cross_Sections = [self.Beam_Cross_Sections]
+        if not isinstance(self[:], list):
+            if len(self[:].shape) == 2:
+                self[:] = [self[:]]
 
         if self.override_dz:
             dz = Distance
         else:
             dz = self.dz
-
-        dzs = np.ones((len(np.arange(0, Distance+dz, dz)), self.Nx, self.Ny)) * np.expand_dims( np.arange(0, Distance+dz, dz) ,(1,2))        
+        
+        epsilon = 1e-5
+        dzs = (np.ones((len(np.arange(dz, Distance + epsilon, dz)), self.Nx, self.Ny)) * np.expand_dims(np.arange(dz, Distance + epsilon, dz), (1,2)) )
+        
         TransferFunction = np.exp(-1j * dzs * np.expand_dims(self.bowl, 0))
 
         if self.reverse_time:
@@ -47,20 +45,17 @@ class Propagate(LightSim):
             TransferFunction = TransferFunction * np.expand_dims(self.Filter, 0)
 
         # The fourier transform to get to k-space
-        F = sfft.fft2(self.Beam_Cross_Sections[-1])
-        F = sfft.fftshift(F)
+        F = np.expand_dims(sfft.fftshift(sfft.fft2(self[-1])), 0)
         # Applying the propagation multiplication to the fourier space
-        KF = TransferFunction * np.expand_dims(F, 0)  # applying the transfer function
-        # Inversing the result to get back to real space
-        self.Beam_Cross_Sections = np.append(
-            self.Beam_Cross_Sections, np.fft.ifft2(KF), axis=0
-        )
-        if self.show_beam:
-            cv2.imshow("Beam Cross section", np.abs(self.Beam_Cross_Sections[-1])**2)
-            cv2.waitKey(50)
-            cv2.imshow("Beam Phase", np.angle(self.Beam_Cross_Sections[-1]))
-            cv2.waitKey(50)
+        KF = TransferFunction * F  # applying the transfer function
+        KF = np.fft.ifft2(sfft.fftshift(KF,axes=(-1,-2))) # kf is shifted temporally
 
+        self.append(KF)
+        if self.show_beam:
+            cv2.imshow("Beam Cross section", np.abs(self[-1])**2)
+            cv2.waitKey(50)
+            cv2.imshow("Beam Phase", np.angle(self[-1]))
+            cv2.waitKey(50)
 
     def PropagatePhasePlane(
         self, Plane: np.ndarray, Forwards: bool = True
@@ -74,22 +69,14 @@ class Propagate(LightSim):
         Returns:
             np.ndarray: The cross section of the beam after the plane
         """
-        if not isinstance(self.Beam_Cross_Sections, list):
-            if len(self.Beam_Cross_Sections.shape) == 2:
-                self.Beam_Cross_Sections = [self.Beam_Cross_Sections]
+        if not isinstance(self[:], list):
+            if len(self[:].shape) == 2:
+                self[:] = [self[:]]
 
         if Forwards:
-            self.Beam_Cross_Sections = np.append(
-                self.Beam_Cross_Sections,
-                [self.Beam_Cross_Sections[-1] * np.exp(1j * np.angle(Plane))],
-                axis=0,
-            )
+            self.append([self[-1] * np.exp(1j * np.angle(Plane))])
         else:
-            self.Beam_Cross_Sections = np.append(
-                self.Beam_Cross_Sections,
-                [self.Beam_Cross_Sections[-1] * np.exp(-1j * np.angle(Plane))],
-                axis=0,
-            )
+            self.append([self[-1] * np.exp(-1j * np.angle(Plane))])
 
     # TODO Turn this into a dunder which parses a given plane set up: forwards propagate += [0.1,0.1,0.1] , backwards propagate -= [0.1,0.1,0.1]
     def Propagate_FromPlane_ToPlane(
@@ -122,9 +109,15 @@ class Propagate(LightSim):
                 if i > 0:
                     i - 1 | self
 
+    def append(self, cross_sections):
+        self[:] = np.append(
+                self[:],
+                cross_sections,
+                axis=0,
+            )
     # * This following code makes everything look cool by adding "Class Operators" using dunder.
     # * For example: Forwards propagation now looks like >> and backwards looks like <<
-
+    
     def __rshift__(self, other):
         """Replacement of the true bitwise function >> (which is not useful in this context) to show forwards propagation.
 
@@ -162,12 +155,29 @@ class Propagate(LightSim):
             self.PropagatePhasePlane(self.Planes[other], Forwards=False)
         elif isinstance(other,np.ndarray):
             self.PropagatePhasePlane(other, Forwards=False)
+    
+    def __getitem__(self, i: int) -> np.ndarray:
+        """When splicing a propagator object, the beam cross section is returned
+
+        Args:
+            i (int): the slice index
+
+        Returns:
+            np.ndarray: the slice at index i
+        """
+        return self.Beam_Cross_Sections[i]
+
+    def __setitem__(self, i, other):
+        if isinstance(i, slice):
+            self.Beam_Cross_Sections = other
+        if isinstance(i, int):
+            self.Beam_Cross_Sections[i] = other
 
     def __str__(self) -> str:
-        if len(self.Beam_Cross_Sections.shape) > 2:
-            return f"<Propagate(Plane set up, Mode Number) object> with Beam Shape {self.Beam_Cross_Sections[-1].shape} and {len(self.Beam_Cross_Sections)} sections"
+        if len(self[:].shape) > 2:
+            return f"<Propagate(Plane set up, Mode Number) object> with Beam Shape {self[-1].shape} and {len(self[:])} sections"
         else:
-            return f"<Propagate(Plane set up, Mode Number) object> with Beam Shape {self.Beam_Cross_Sections.shape} and 1 section"
+            return f"<Propagate(Plane set up, Mode Number) object> with Beam Shape {self[:].shape} and 1 section"
 
 
 if __name__ == "__main__":
@@ -175,9 +185,10 @@ if __name__ == "__main__":
     from Visualiser import Visualiser
     InitialBeamWaist = 40e-6
     spotSeparation = np.sqrt(4) * InitialBeamWaist
-    propagator = Propagate(override_dz=True,show_beam=False)
+    propagator = Propagate(override_dz=False,show_beam=False)
+    
     LightSim.number_of_modes = 20
-
+    LightSim.reverse_time = True
     mode_maker = mulmo(Amplitude = 5)
     Modes = mode_maker.makeModes(
         InitialBeamWaist,
@@ -186,7 +197,6 @@ if __name__ == "__main__":
         "hg"
     )
     
-
     # test_mode = Modes[3][0]
     # propagator.Beam_Cross_Sections = test_mode
     # print(propagator)
@@ -207,21 +217,27 @@ if __name__ == "__main__":
     spiral = np.exp(1j * m * spiral)
     z_dist = 0.03
     visual = Visualiser(save_to_file=False, show_Propagation_live=True)
-    old_times = []
-    propagator.Beam_Cross_Sections = Modes[1]
-    propagator >> 0.1
+    propagator[:] = Modes[1]
+    print(propagator)
+    rand_plane = np.random.rand(propagator.Nx,propagator.Ny) + 1J*np.random.rand(propagator.Nx,propagator.Ny)
+    print(rand_plane)
+    propagator >> 0.03
+    propagator | rand_plane
+    propagator >> 0.01
+    propagator | rand_plane
+    propagator >> 0.01
 
-    visual.VisualiseBeam(np.abs(propagator.Beam_Cross_Sections)**2, "Testing")
+    visual.VisualiseBeam(np.abs(propagator[:])**2, "Testing speed update")
     
-    propagator.Beam_Cross_Sections = np.sum(Modes,axis=0)
+    propagator[:] = np.sum(Modes,axis=0)
     for mode in Modes:
-        propagator.Beam_Cross_Sections = mode
-        LightSim.VERSION +=1
+        propagator[:] = mode
+        LightSim.VERSION += 1
         #propagator.Beam_Cross_Sections = np.ones((propagator.Nx, propagator.Ny), dtype=np.complex128)
         propagator >> 0.05
         #propagator | spiral
         #propagator >> z_dist
-        visual.VisualiseBeam(np.abs([propagator.Beam_Cross_Sections[-1]]), "transparent33", on_white="alpha")
+        visual.VisualiseBeam(np.abs([propagator[-1]]), "transparent33", on_white="alpha")
     #z_dist << propagator
     #spiral | propagator
     #propagator | spiral
