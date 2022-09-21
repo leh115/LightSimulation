@@ -31,7 +31,7 @@ for version_number, sep_factor in enumerate([1]):#np.linspace(1,20,10)):
         propagate_to_output=False,
     )
 
-    updater = Updater(save_to_file=True)
+    updater = Updater(save_to_file=False)
     updater.mask_offset = ( np.sqrt(137) / np.sqrt(0**2 + 1**2) ) * ( 0*np.sqrt(1e-3 / (updater.Nx * updater.Ny)) + 1*1j * np.sqrt(1e-3 / (updater.Nx * updater.Ny)) ) 
     updater.show_modes_at_start = False
 
