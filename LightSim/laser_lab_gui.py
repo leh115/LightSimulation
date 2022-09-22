@@ -6,9 +6,17 @@ import numpy as np
 class lab(Scene):
     def construct(self):
         """Manim uses a constuct method to generate a Scene"""
+
         for x in range(-15, 15):
             for y in range(-15, 15):
                 self.add(Dot(np.array([x, y, 0]), color=GREY))
+
+        self.add(NumberPlane(background_line_style={
+                "stroke_color": TEAL,
+                "stroke_width": 1,
+                "stroke_opacity": 0.3
+            }).set_stroke(opacity= 0.1))
+        
         self.lasers = []
         self.thin_lenses = []
         self.prisms = []
@@ -65,13 +73,14 @@ class lab(Scene):
     def turn_on_laser(self):
         print("Checking if laser should turn on")
         mp = self.mouse_point
-        pos = [round(mp.get_x()), round(mp.get_y()), round(mp.get_z())]
+        pos = self.round_loc(mp)
         
         laser_here = False
         for i, el in enumerate(self.elements):
-            if el == pos:
+            if self.round_loc(el[0]) == pos:
                 laser_here = True
-                self.propagate_beam(np.add(pos,[0.6,0,0]))
+                #self.propagate_beam(np.add(pos,[0.6,0,0]),self.elements_rotation[i])
+                self.propagate_beam(pos,el[1])
         if not laser_here:
             t = Text("No laser found")
             self.play(FadeIn(t))
@@ -79,10 +88,12 @@ class lab(Scene):
             self.play(FadeOut(t))
 
             
-    def propagate_beam(self,start):
-        print(start)
-        print(np.add(start,[1,0,0]))
-        self.play(ShowCreation(Line(start = start,end = np.add(start,[1,0,0]))))
+    def propagate_beam(self,start,rotation):
+        multiplier = 0.6
+        a = np.add(start,[multiplier*np.cos(rotation),multiplier*np.sin(rotation),0])
+        b = np.add(a,[np.cos(rotation)*0.4,np.sin(rotation)*0.4,0])
+        beam = Line(start = a, end = b,color=RED)
+        self.play(ShowCreation(beam))
 
     def snap_to_position(self, element:mobject, element_name, unsnapped_point, offset):
         """Takes in an object and point and snaps it to the closest integer point
@@ -99,26 +110,31 @@ class lab(Scene):
             )
         else:
             pos = self.mouse_point
-        
+        print(self.elements)
         #check if element is already in this position
         loc_available = True
         for el in self.elements:
-            if el == [pos.get_x(), pos.get_y(), pos.get_z()]:
+            if self.round_loc(el[0]) == self.round_loc(pos):
                 loc_available = False
+                t = Text("Cannot place here")
+                self.play(FadeIn(t))
+                self.play(FadeOut(t))
         if loc_available:
             element.move_to(pos).rotate(self.rotation, np.array([0, 0, 1]))
             if element_name=="Laser":
-                self.lasers.append([pos.get_x(),pos.get_y(),pos.get_z()])
+                self.lasers.append(self.round_loc(pos))
             elif element_name=="Prism":
-                self.prisms.append([pos.get_x(),pos.get_y(),pos.get_z()])
+                self.prisms.append(self.round_loc(pos))
             elif element_name=="Thin Lens":
-                self.thin_lenses.append([pos.get_x(),pos.get_y(),pos.get_z()])
-            self.elements.append([pos.get_x(),pos.get_y(),pos.get_z()])
+                self.thin_lenses.append(self.round_loc(pos))
+            self.elements.append([element,self.rotation])
             return True
         else:
             del element
             return False
 
+    def round_loc(self,loc):
+        return [round(loc.get_x()), round(loc.get_y()), round(loc.get_z())] 
         
 
     def on_key_press(self, symbol, modifiers):
@@ -134,7 +150,10 @@ class lab(Scene):
             logger.warning("The value of the pressed key is too large.")
             return
         if char == "r":
-            self.rotation += np.pi / 4
+            if self.rotation < 5.49: # keep between 0 and 2pi
+                self.rotation += np.pi / 4
+            else:
+                self.rotation = 0
             self.cursor.rotate(np.pi / 4, np.array([0, 0, 1]))
         elif char == "q":
             self.quit_interaction = True
