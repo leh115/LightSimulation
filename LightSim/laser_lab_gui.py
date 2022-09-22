@@ -1,7 +1,5 @@
-import this
 from manimlib import *
 import numpy as np
-
 
 class lab(Scene):
     def construct(self):
@@ -79,7 +77,6 @@ class lab(Scene):
         for i, el in enumerate(self.elements):
             if self.round_loc(el[0]) == pos:
                 laser_here = True
-                #self.propagate_beam(np.add(pos,[0.6,0,0]),self.elements_rotation[i])
                 self.propagate_beam(pos,el[1])
         if not laser_here:
             t = Text("No laser found")
@@ -91,9 +88,37 @@ class lab(Scene):
     def propagate_beam(self,start,rotation):
         multiplier = 0.6
         a = np.add(start,[multiplier*np.cos(rotation),multiplier*np.sin(rotation),0])
-        b = np.add(a,[np.cos(rotation)*0.4,np.sin(rotation)*0.4,0])
+        if self.test_angled(rotation):
+            b = np.round(np.add(a,[np.cos(rotation)*(1-multiplier)*2, np.sin(rotation)*(1-multiplier)*2, 0]))
+        else:
+            b = np.round(np.add(a,[np.cos(rotation)*(1-multiplier),np.sin(rotation)*(1-multiplier),0]))
         beam = Line(start = a, end = b,color=RED)
         self.play(ShowCreation(beam))
+        
+        for i in range(20):
+            el_bool,el = self.element_here(b)
+            if el_bool:
+                pass
+            else:
+                c = np.round(np.add(b,[np.cos(rotation),np.sin(rotation),0]))
+                beam = Line(start = b, end = c,color=RED)
+                self.play(ShowCreation(beam), run_time=1/(i+1))
+                b = c
+    
+    def test_angled(self,rotation):
+        for angle in [round(np.pi/4, 3),round(3*np.pi/4, 3),round(5*np.pi/4, 3),round(7*np.pi/4, 3)]:
+            if round(rotation, 3) == angle:
+                return True
+    
+    def element_here(self,loc):
+        for el in self.elements:
+            equal_positions = True
+            for i, el_loc in enumerate(np.array(self.round_loc(el[0]))):
+                if el_loc != loc[i]:
+                    equal_positions = False
+            if equal_positions:
+                return True, el
+        return False, None
 
     def snap_to_position(self, element:mobject, element_name, unsnapped_point, offset):
         """Takes in an object and point and snaps it to the closest integer point
@@ -135,6 +160,7 @@ class lab(Scene):
 
     def round_loc(self,loc):
         return [round(loc.get_x()), round(loc.get_y()), round(loc.get_z())] 
+
         
 
     def on_key_press(self, symbol, modifiers):
