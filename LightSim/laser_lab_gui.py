@@ -114,6 +114,8 @@ class lab(Scene):
             return element, element_name
 
     def turn_on_laser(self):
+        """Triggers an animation to show the beam from any given laser
+        """
         print("Checking if laser should turn on")
         mp = self.mouse_point
         pos = self.round_loc(mp)
@@ -170,6 +172,14 @@ class lab(Scene):
                 b = c
 
     def test_angled(self, rotation):
+        """checks the angle of the element is not horizontal or vertical
+
+        Args:
+            rotation: The rotation of the element when it was placed
+
+        Returns:
+            Bool: True if angle is 45 degrees to an axis
+        """
         for angle in [
             round(np.pi / 4, 3),
             round(3 * np.pi / 4, 3),
@@ -228,6 +238,14 @@ class lab(Scene):
             return False
 
     def round_loc(self, loc):
+        """Performs the snap
+
+        Args:
+            loc (Point): An unrounded point object
+
+        Returns:
+            Point: A rounded point object
+        """
         return [round(loc.get_x()), round(loc.get_y()), round(loc.get_z())]
 
     def on_key_press(self, symbol, modifiers):
