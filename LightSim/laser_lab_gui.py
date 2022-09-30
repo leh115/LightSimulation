@@ -1,6 +1,6 @@
 from manimlib import *
 import numpy as np
-
+from ray_transfer_matrix_class import ray_transfer as rt
 
 class lab(Scene):
     def construct(self):
