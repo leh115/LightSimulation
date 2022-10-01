@@ -30,7 +30,7 @@ class lab_objects:
                 color=BLUE,
                 fill_opacity=opacity,
                 stroke_opacity=opacity,
-            ),
+                ).rotate(np.pi/2),
             "Thin Lens",
             creation_method,
             is_cursor=is_cursor,
@@ -86,7 +86,7 @@ class lab_objects:
     ):
         self.mouse_point = mouse_point
         return self.create_element(
-            Rectangle(width=0.2, height=1, color=GREY, fill_opacity=opacity),
+            Rectangle(width=0.1, height=1, color=GREY, fill_opacity=opacity).rotate(np.pi/2),
             "Flat Mirror",
             creation_method,
             is_cursor=is_cursor,

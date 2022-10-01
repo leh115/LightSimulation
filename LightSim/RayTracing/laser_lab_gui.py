@@ -2,6 +2,7 @@ import sys
 
 import numpy as np
 import time
+
 from manimlib import *
 
 sys.path.append("D:/Uni Masters/Project/code/LightSimulation/LightSim/RayTracing")
@@ -35,6 +36,8 @@ class lab(Scene):
         self.play(player)
         always(self.cursor.move_to, self.mouse_point)
         self.labjects.elements = []
+
+        self.rays = rays(self.debug)
         
     def turn_on_laser(self):
         """Triggers an animation to show the beam from any given laser
@@ -84,17 +87,38 @@ class lab(Scene):
             )
         beam = Line(start=a, end=b, color=RED)
         self.play(ShowCreation(beam))
-
+        element_interaction = None
+        rad_angle = 0
         for i in range(distance):
             el_bool, el = self.labjects.element_here(b)
             if el_bool:
-                self.debugger(f"Laser beam hit a {el[0].__name__.lower()}","Propagation method",1)
+                rad_angle = rotation - el[1]
+                rad_angle = np.abs(rad_angle)
+                #rad_angle -= np.pi/2
+                #if rad_angle<0:
+                #    rad_angle += 2*np.pi
+                self.debugger(f"Laser beam hit a {el[0].__name__.lower()} at a {180*(rad_angle)/np.pi} degree angle","Propagation method",1)
+                element_interaction = el[0].__name__
                 break
             else:
                 c = np.round(np.add(b, [np.cos(rotation), np.sin(rotation), 0]))
                 beam = Line(start=b, end=c, color=RED)
                 self.play(ShowCreation(beam), run_time=1 / (i + 1))
                 b = c
+
+        beam_x_mat, beam_y_mat = self.rays.loc_rot_2_mats(location= [1, 0], rotation=rad_angle)
+        if element_interaction is None:
+            pass
+        elif element_interaction == "Flat Mirror":
+            self.debugger(f"Calculating flat mirror interaction","Propagation method",1)
+            x_rot = self.rays.flat_mirror(beam_x_mat)
+            y_rot = self.rays.flat_mirror(beam_y_mat)
+            self.debugger(x_rot[1]*np.pi,"Propagation method",1)
+            self.debugger(y_rot[1]*np.pi,"Propagation method",1)
+            c = np.round(np.add(b, [x_rot[1], y_rot[1], 0]))
+            beam = Line(start=b, end=c, color=RED)
+            self.play(ShowCreation(beam), run_time=1 / (i + 1))
+
     #! this is outdated and needs to work for all angles
     def test_angled(self, rotation):
         """checks the angle of the element is not horizontal or vertical
@@ -113,16 +137,6 @@ class lab(Scene):
         ]:
             if round(rotation, 3) == angle:
                 return True
-
-    def element_here(self, loc):
-        for el in self.labjects.elements:
-            equal_positions = True
-            for i, el_loc in enumerate(np.array(self.labjects.round_loc(el[0]))):
-                if el_loc != loc[i]:
-                    equal_positions = False
-            if equal_positions:
-                return True, el
-        return False, None
 
     def on_key_press(self, symbol, modifiers):
         """Manim uses this method for accepting input, by writing it here the method is overridden
