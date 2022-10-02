@@ -109,7 +109,7 @@ class lab_objects:
             offset (list, optional): Defaults to [0, 0, 0].
 
         Returns:
-            _type_: _description_
+            mobject, mobject animation, create_bool: The created element, the animation of it, if it was created or not
         """
         element.__name__ = element_name
         self.debugger(f"Creation method: {creation_method}", "Create element method", 1)
