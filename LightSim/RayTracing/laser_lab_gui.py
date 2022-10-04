@@ -5,7 +5,7 @@ import time
 
 from manimlib import *
 
-sys.path.append("D:/Uni Masters/Project/code/LightSimulation/LightSim/RayTracing")
+sys.path.append("D:/Uni/Uni Masters/Project/code/LightSimulation/LightSim/RayTracing")
 from ray_transfer_matrix_class import ray_transfer as rays
 from lab_objects import lab_objects
 
@@ -19,12 +19,14 @@ class lab(Scene):
                 self.add(Dot(np.array([x, y, 0]), color=GREY))
 
         self.add(
-            NumberPlane(x_range=(-15,15),y_range=(-15,15),
+            NumberPlane(
+                x_range=(-15, 15),
+                y_range=(-15, 15),
                 background_line_style={
                     "stroke_color": TEAL,
                     "stroke_width": 1,
                     "stroke_opacity": 0.3,
-                }
+                },
             ).set_stroke(opacity=0.1)
         )
         self.last_method_name = ""
@@ -32,17 +34,18 @@ class lab(Scene):
         self.labjects = lab_objects(self.mouse_point, self.debug)
         self.cursor_element = self.labjects.laser
         self.cursor_opacity = 0.3
-        self.cursor, player, _ = self.cursor_element(self.mouse_point, opacity=self.cursor_opacity)
+        self.cursor, player, _ = self.cursor_element(
+            self.mouse_point, opacity=self.cursor_opacity
+        )
         self.play(player)
         always(self.cursor.move_to, self.mouse_point)
         self.labjects.elements = []
 
         self.rays = rays(self.debug)
-        
+
     def turn_on_laser(self):
-        """Triggers an animation to show the beam from any given laser
-        """
-        self.debugger("Checking if laser should turn on","Turn on laser")
+        """Triggers an animation to show the beam from any given laser"""
+        self.debugger("Checking if laser should turn on", "Turn on laser")
         mp = self.mouse_point
         pos = self.labjects.round_loc(mp)
 
@@ -50,7 +53,7 @@ class lab(Scene):
         for i, el in enumerate(self.labjects.elements):
             if self.labjects.round_loc(el[0]) == pos:
                 laser_here = True
-                self.debugger("Laser turning on","Turn on laser")
+                self.debugger("Laser turning on", "Turn on laser")
                 self.propagate_beam(pos, el[1])
         if not laser_here:
             t = Text("No laser found")
@@ -58,7 +61,7 @@ class lab(Scene):
             self.wait()
             self.play(FadeOut(t))
 
-    def propagate_beam(self, start, rotation, distance=20):
+    def propagate_beam(self, start, rotation, distance=2):
         multiplier = 0.6
         a = np.add(
             start, [multiplier * np.cos(rotation), multiplier * np.sin(rotation), 0]
@@ -88,34 +91,79 @@ class lab(Scene):
         beam = Line(start=a, end=b, color=RED)
         self.play(ShowCreation(beam))
         element_interaction = None
+        el_location = [0, 0]
         rad_angle = 0
         for i in range(distance):
             el_bool, el = self.labjects.element_here(b)
             if el_bool:
                 rad_angle = rotation - el[1]
                 rad_angle = np.abs(rad_angle)
-                #rad_angle -= np.pi/2
-                #if rad_angle<0:
-                #    rad_angle += 2*np.pi
-                self.debugger(f"Laser beam hit a {el[0].__name__.lower()} at a {180*(rad_angle)/np.pi} degree angle","Propagation method",1)
+                self.debugger(
+                    f"Laser beam hit a {el[0].__name__.lower()} at a {180*(rad_angle)/np.pi} degree angle",
+                    "Propagation method",
+                    1,
+                )
                 element_interaction = el[0].__name__
+                el_location = self.labjects.round_loc(el[0])
                 break
             else:
-                c = np.round(np.add(b, [np.cos(rotation), np.sin(rotation), 0]))
+                
+                normaliser = (np.pi / 2)
+                c_x_r = self.rays.free_space(
+                    beam_matrix = np.array([b[0], np.sin(rotation+np.pi/2)]), distance=1
+                )
+                new_x = c_x_r[0]/np.abs(c_x_r[0])
+                new_y = b[1] + (1 - (c_x_r[1]**3) / c_x_r[1])
+                self.debugger(f"Free space output: {c_x_r}","Propagation method",1)
+                self.debugger(
+                    f"x [{b[0]} --> {c_x_r[0]}], y [{b[1]} --> {new_y}], theta [{rotation} --> {c_x_r[1]}]",
+                    "Propagation method",
+                    1,
+                )
+                c = [new_x, new_y, 0]
                 beam = Line(start=b, end=c, color=RED)
                 self.play(ShowCreation(beam), run_time=1 / (i + 1))
                 b = c
 
-        beam_x_mat, beam_y_mat = self.rays.loc_rot_2_mats(location= [1, 0], rotation=rad_angle)
+        beam_x_mat, beam_y_mat = self.rays.loc_rot_2_mats(
+            location=el_location, rotation=rotation
+        )
+
         if element_interaction is None:
             pass
         elif element_interaction == "Flat Mirror":
-            self.debugger(f"Calculating flat mirror interaction","Propagation method",1)
+            self.debugger(
+                f"Calculating flat mirror interaction", "Propagation method", 1
+            )
             x_rot = self.rays.flat_mirror(beam_x_mat)
             y_rot = self.rays.flat_mirror(beam_y_mat)
-            self.debugger(x_rot[1]*np.pi,"Propagation method",1)
-            self.debugger(y_rot[1]*np.pi,"Propagation method",1)
+            self.debugger(x_rot[1] * np.pi, "Propagation method", 1)
+            self.debugger(y_rot[1] * np.pi, "Propagation method", 1)
             c = np.round(np.add(b, [x_rot[1], y_rot[1], 0]))
+            beam = Line(start=b, end=c, color=RED)
+            self.play(ShowCreation(beam), run_time=1 / (i + 1))
+
+        elif element_interaction == "Thin Lens":
+            self.debugger(f"Calculating thin lens interaction", "Propagation method", 1)
+            x_thin_lens = self.rays.thin_lens([el_location[0], rotation])
+
+            self.debugger(
+                f"Location: x = {el_location[0]}, y = {el_location[1]}  Rotation: {rotation}rad",
+                "Propagation method",
+                1,
+            )
+            if (rotation - np.pi) < 0:
+                new_x = x_thin_lens[0]
+            else:
+                new_x = el_location[0] - np.abs(x_thin_lens[0] - el_location[0])
+            new_y = el_location[1] + (x_thin_lens[0] - el_location[0]) * np.sin(
+                x_thin_lens[1]
+            )  #% np.pi)
+            self.debugger(f"New x: {new_x}, New y: {new_y}", "Propagation method", 1)
+            # [x_1, theta_1] = M[x_0, theta_0]
+            # y_1 = y_0 + (x_1 - x_0)*theta_1
+            print(x_thin_lens)
+            c = [new_x, new_y, 0]
             beam = Line(start=b, end=c, color=RED)
             self.play(ShowCreation(beam), run_time=1 / (i + 1))
 
@@ -185,25 +233,31 @@ class lab(Scene):
             self.change_cursor(self.labjects.flat_mirror)
 
     def change_cursor(self, new_element_method: classmethod):
-        new_cursor, player, _ = new_element_method(self.mouse_point,
-            creation_method="none", opacity=self.cursor_opacity,is_cursor=True,
+        new_cursor, player, _ = new_element_method(
+            self.mouse_point,
+            creation_method="none",
+            opacity=self.cursor_opacity,
+            is_cursor=True,
         )
         new_name = Text(new_cursor.__name__).move_to(TOP + DOWN)
         always(new_cursor.move_to, self.mouse_point)
         self.cursor_element = new_element_method
         self.play(
-            ReplacementTransform(self.cursor, new_cursor.rotate(self.labjects.rotation)),
+            ReplacementTransform(
+                self.cursor, new_cursor.rotate(self.labjects.rotation)
+            ),
             Write(new_name),
         )
         self.cursor = new_cursor
         self.wait(1)
         self.play(FadeOut(new_name))
 
+    def debugger(self, debug_str: str, method_name: str = "", method_int=0):
 
-    def debugger(self, debug_str:str, method_name:str = "", method_int = 0):
-        
         if self.debug:
             if self.last_method_name is not method_name:
                 print("")
-            print(str(" "*method_int*4) +"~"+method_name +" ... "+ str(debug_str))
+            print(
+                str(" " * method_int * 4) + "~" + method_name + " ... " + str(debug_str)
+            )
             self.last_method_name = method_name

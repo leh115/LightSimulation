@@ -8,8 +8,14 @@ class ray_transfer:
 
     def flat_mirror(self, beam_matrix, mirror_rotation=[0, 0], beam_rotation=[0, 0]):
         flat_mirror_matrix = np.array([[1, 0], [0, -1]])
-        self.matrix_debugger(flat_mirror_matrix, "Flat Mirror", "Bounce", 1)
+        self.matrix_debugger(flat_mirror_matrix, "Flat Mirror", "Bounce", 2)
         return np.round(np.matmul(beam_matrix, flat_mirror_matrix.transpose()), 2)
+
+    def thin_lens(self, beam_matrix):
+        f = 0.5
+        thin_lens_matrix = np.array([[1,0],[-1/f,1]])
+        self.matrix_debugger(thin_lens_matrix, "Thin Lens", "Lensing", 2)
+        return self.free_space(np.round(np.matmul(beam_matrix, thin_lens_matrix.transpose()), 2),1)
 
     def free_space(self, beam_matrix, distance):
         assert type(beam_matrix) is np.ndarray, f"Needs to be a numpy array, not a {type(beam_matrix)}"
