@@ -5,6 +5,7 @@ import time
 
 from manimlib import *
 
+
 sys.path.append("D:/Uni/Uni Masters/Project/code/LightSimulation/LightSim/RayTracing")
 from ray_transfer_matrix_class import ray_transfer as rays
 from lab_objects import lab_objects
@@ -44,7 +45,7 @@ class lab(Scene):
         self.labjects.elements = []
 
         self.rays = rays(self.debug)
-        self.laser_steps = 5
+        self.laser_steps = 3
         self.mouse_press_callbacks = [self.interactive_add]
         self.on_key_press = self.key_press
         
@@ -56,11 +57,12 @@ class lab(Scene):
         pos = self.labjects.round_loc(mp)
 
         laser_here = False
-        for i, el in enumerate(self.labjects.elements):
+        for _, el in enumerate(self.labjects.elements):
             if self.labjects.round_loc(el[0]) == pos:
                 laser_here = True
                 self.debugger("Laser turning on", "Turn on laser")
                 self.propagate_beam(pos, el[1])
+                break
         if not laser_here:
             t = Text("No laser found")
             self.play(FadeIn(t))
@@ -68,42 +70,19 @@ class lab(Scene):
             self.play(FadeOut(t))
 
     def propagate_beam(self, start, rotation):
-        steps = self.laser_steps
+        #b = start
         multiplier = 0.6
-        a = np.add(
+        b = np.add(
             start, [multiplier * np.cos(rotation), multiplier * np.sin(rotation), 0]
         )
-        if self.test_angled(rotation):
-            b = np.round(
-                np.add(
-                    a,
-                    [
-                        np.cos(rotation) * (1 - multiplier) * 2,
-                        np.sin(rotation) * (1 - multiplier) * 2,
-                        0,
-                    ],
-                )
-            )
-        else:
-            b = np.round(
-                np.add(
-                    a,
-                    [
-                        np.cos(rotation) * (1 - multiplier),
-                        np.sin(rotation) * (1 - multiplier),
-                        0,
-                    ],
-                )
-            )
-        self.make_beam(a,b,1)
         element_interaction = None
         el_location = [0, 0]
         rad_angle = 0
-        for i in range(steps):
+        for step in range(self.laser_steps):
             el_bool, el = self.labjects.element_here(b)
-            if el_bool and el[0].__name__!="Beam":
-                rad_angle = rotation - el[1]
-                rad_angle = np.abs(rad_angle)
+            print(step)
+            if step>0 and el_bool and el[0].__name__!="Beam":
+                rad_angle = np.abs(rotation - el[1])
                 self.debugger(
                     f"Laser beam hit a {el[0].__name__.lower()} at a {180*(rad_angle)/np.pi} degree angle",
                     "Propagation method",
@@ -112,12 +91,11 @@ class lab(Scene):
                 element_interaction = el[0].__name__
                 el_location = self.labjects.round_loc(el[0])
                 break
-            else:
-                
+            else:                
                 c_x_r = self.rays.free_space(
                     beam_matrix = np.array([b[0], np.sin(rotation+np.pi/2)]), distance=1
                 )
-                unit_x = c_x_r[0] - b[0]
+                unit_x = c_x_r[0] - b[0] 
                 unit_y = np.sin( np.arcsin(c_x_r[1]) + np.sign(-(rotation - np.pi + 1e-4))*np.pi/2)
                 
                 if unit_x!=0:
@@ -126,6 +104,9 @@ class lab(Scene):
 
                 new_x = b[0] + unit_x
                 new_y = b[1] + unit_y
+                if step == 0:
+                    new_x = round(new_x)
+                    new_y = round(new_y)
 
                 self.debugger(f"Free space output: {c_x_r}", "Propagation method", 1)
                 self.debugger(
@@ -133,17 +114,18 @@ class lab(Scene):
                     "Propagation method",
                     1,
                 )
-                c = [new_x, new_y, 0]
-                self.make_beam(b,c,i)
+                c = [np.round(new_x, 1), np.round(new_y, 1), np.round(0, 1)]
+                self.make_beam(b,c,step)
                 b = c
+        else:
+            self.debugger(f"No interactions", "Propagation method", 1)
 
         beam_x_mat, beam_y_mat = self.rays.loc_rot_2_mats(
             location=el_location, rotation=rotation
         )
+        
 
-        if element_interaction is None:
-            pass
-        elif element_interaction == "Flat Mirror":
+        if element_interaction == "Flat Mirror":
             self.debugger(
                 f"Calculating flat mirror interaction", "Propagation method", 1
             )
@@ -174,36 +156,30 @@ class lab(Scene):
             # y_1 = y_0 + (x_1 - x_0)*theta_1
             print(x_thin_lens)
             c = [new_x, new_y, 0]
-        self.make_beam(b, c, i)
+        self.make_beam(b, c, self.laser_steps)
 
     def make_beam(self, b, c, i):
         beam = Line(start=b, end=c, color=RED)
         beam.__name__ = "Beam"
         self.labjects += [beam,0]
-        self.play(ShowCreation(beam), run_time= 0.5 / (i + 1))
-
-    #! this is outdated and needs to work for all angles
-    def test_angled(self, rotation):
-        """checks the angle of the element is not horizontal or vertical
-
-        Args:
-            rotation: The rotation of the element when it was placed
-
-        Returns:
-            Bool: True if angle is 45 degrees to an axis
-        """
-        for angle in [
-            round(np.pi / 4, 3),
-            round(3 * np.pi / 4, 3),
-            round(5 * np.pi / 4, 3),
-            round(7 * np.pi / 4, 3),
-        ]:
-            if round(rotation, 3) == angle:
-                return True
+        self.play(ShowCreation(beam), run_time= 1 / (i + 1))
 
     def on_mouse_press(self, point, button, modifiers):
-        for func in self.mouse_press_callbacks:
-            func()
+        print(button)
+        print(modifiers)
+        if button == 1:
+            for func in self.mouse_press_callbacks:
+                func()
+        elif button == 4:
+            self.turn_on_laser()
+    
+    def on_mouse_scroll(self, point, offset):
+        if offset[1]<0:
+            self.rotate_cursor()
+            return
+        self.rotate_cursor(direction=-1)
+        
+
     def type_input(self, symbol, modifiers):
         try:
             char = chr(symbol)
@@ -253,11 +229,7 @@ class lab(Scene):
             self.debugger(f"Character key pressed: {char}","key press")
 
         if char == "r":
-            if self.labjects.rotation < 5.49:  # keep between 0 and 2pi
-                self.labjects.rotation += np.pi / 4
-            else:
-                self.labjects.rotation = 0
-            self.cursor.rotate(np.pi / 4, np.array([0, 0, 1]))
+            self.rotate_cursor()
         elif char == "q":
             self.quit_interaction = True
         elif char == "a":
@@ -312,7 +284,11 @@ class lab(Scene):
         self.cursor = new_cursor
         self.wait(1)
         self.play(FadeOut(new_name))
-    
+
+    def rotate_cursor(self, direction=1):
+        self.labjects.rotation = (self.labjects.rotation + direction * np.pi / 4) % (2*np.pi)
+        self.cursor.rotate(direction * np.pi / 4, np.array([0, 0, 1]))
+
     def interactive_add(self):
         print(" ")
         element, player, create_bool = self.cursor_element(self.mouse_point)
@@ -326,6 +302,7 @@ class lab(Scene):
         t = Text("Laser distance: " + str(self.laser_steps)).move_to(TOP).shift(DOWN)
         self.play(FadeIn(t))
         self.play(FadeOut(t))
+
     def clear_everything(self):
         print("Clearing all")
         fade_outs = []
