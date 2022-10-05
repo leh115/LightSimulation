@@ -6,18 +6,18 @@ class ray_transfer:
         self.debug = debug
         self.last_method_name = []
 
-    def flat_mirror(self, beam_matrix, mirror_rotation=[0, 0], beam_rotation=[0, 0]):
+    def flat_mirror(self, beam_matrix:np.ndarray, mirror_rotation=[0, 0], beam_rotation=[0, 0]):
         flat_mirror_matrix = np.array([[1, 0], [0, -1]])
-        self.matrix_debugger(flat_mirror_matrix, "Flat Mirror", "Bounce", 2)
+        self.matrix_debugger(flat_mirror_matrix, beam_matrix, "Flat Mirror", "Bounce", 2)
         return np.round(np.matmul(beam_matrix, flat_mirror_matrix.transpose()), 2)
 
-    def thin_lens(self, beam_matrix):
+    def thin_lens(self, beam_matrix:np.ndarray):
         f = 0.5
         thin_lens_matrix = np.array([[1,0],[-1/f,1]])
-        self.matrix_debugger(thin_lens_matrix, "Thin Lens", "Lensing", 2)
+        self.matrix_debugger(thin_lens_matrix, beam_matrix, "Thin Lens", "Lensing", 2)
         return self.free_space(np.round(np.matmul(beam_matrix, thin_lens_matrix.transpose()), 2),1)
 
-    def free_space(self, beam_matrix, distance):
+    def free_space(self, beam_matrix:np.ndarray, distance:float):
         assert type(beam_matrix) is np.ndarray, f"Needs to be a numpy array, not a {type(beam_matrix)}"
         try:
             assert beam_matrix.shape == (2, 1) or beam_matrix.shape == (
@@ -26,7 +26,7 @@ class ray_transfer:
         except Exception as e:
             print(e)
         free_space_matrix = np.array([[1, distance], [0, 1]])
-        self.matrix_debugger(free_space_matrix, "Free Space", "Propagation", 1)
+        self.matrix_debugger(free_space_matrix, beam_matrix, "Free Space", "Propagation", 2)
         return np.round(np.matmul(beam_matrix, free_space_matrix.transpose()), 2)
 
     def loc_rot_2_mats(self, location=[0, 0], rotation=0):
@@ -34,7 +34,7 @@ class ray_transfer:
         beam_matrix_y = np.array([location[1], np.cos(rotation)])
         return beam_matrix_x, beam_matrix_y
 
-    def debugger(self, debug_str: str, method_name: str = "", method_int=0):
+    def debugger(self, debug_str: str, method_name: str = "", method_int:int=0):
         if self.debug:
             if self.last_method_name is not method_name:
                 print("")
@@ -43,10 +43,21 @@ class ray_transfer:
             )
             self.last_method_name = method_name
 
-    def matrix_debugger(self, matrix, method_name, matrix_name, method_int):
+    def matrix_debugger(self, matrix:np.ndarray, beam_matrix:np.ndarray, method_name:str, matrix_name:str, method_int:int):
+        """Used specifically to debug matrices in a prettified way
+
+        Args:
+            matrix (np.ndarray): The transform matrix
+            beam_matrix (np.ndarray): The input (2,1) matrix of [x, theta]
+            method_name (str): 
+            matrix_name (str): 
+            method_int (int): 
+        """
         self.debugger(f"{matrix_name} with matrix: ", method_name, method_int)
-        self.debugger(f"{np.round(matrix[0], 2)}", method_name, method_int)
-        self.debugger(f"{np.round(matrix[1], 2)}", method_name, method_int)
+        out_matrix = np.round(np.matmul(beam_matrix, matrix.transpose()), 2)
+        self.debugger(f"{out_matrix[0]} = {np.round(beam_matrix[0],2)} |{np.round(matrix[0][0], 2)} {np.round(matrix[0][1], 2)}|", method_name, method_int)
+        white_space_added = len(f"{out_matrix[0]} = {np.round(beam_matrix[0],2)}") - len(f"{out_matrix[1]} = {beam_matrix[1]}")
+        self.debugger(f"{out_matrix[1]}   {np.round(beam_matrix[1],2)}"+white_space_added*" "+f" |{np.round(matrix[1][0], 2)} {np.round(matrix[1][1], 2)}|", method_name, method_int)
 
 if __name__ == "__main__":
     rays = ray_transfer(True)

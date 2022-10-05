@@ -42,6 +42,9 @@ class lab(Scene):
         self.labjects.elements = []
 
         self.rays = rays(self.debug)
+        
+        self.mouse_press_callbacks = [self.interactive_add]
+        
 
     def turn_on_laser(self):
         """Triggers an animation to show the beam from any given laser"""
@@ -61,7 +64,7 @@ class lab(Scene):
             self.wait()
             self.play(FadeOut(t))
 
-    def propagate_beam(self, start, rotation, distance=2):
+    def propagate_beam(self, start, rotation, steps=20):
         multiplier = 0.6
         a = np.add(
             start, [multiplier * np.cos(rotation), multiplier * np.sin(rotation), 0]
@@ -93,7 +96,7 @@ class lab(Scene):
         element_interaction = None
         el_location = [0, 0]
         rad_angle = 0
-        for i in range(distance):
+        for i in range(steps):
             el_bool, el = self.labjects.element_here(b)
             if el_bool:
                 rad_angle = rotation - el[1]
@@ -108,15 +111,18 @@ class lab(Scene):
                 break
             else:
                 
-                normaliser = (np.pi / 2)
                 c_x_r = self.rays.free_space(
                     beam_matrix = np.array([b[0], np.sin(rotation+np.pi/2)]), distance=1
                 )
-                new_x = c_x_r[0]/np.abs(c_x_r[0])
-                new_y = b[1] + (1 - (c_x_r[1]**3) / c_x_r[1])
-                self.debugger(f"Free space output: {c_x_r}","Propagation method",1)
+                unit_x = c_x_r[0] - b[0]
+                unit_y = np.sin( np.arcsin(c_x_r[1]) + np.sign(-(rotation - np.pi + 1e-4))*np.pi/2)
+                
+                new_x = b[0] + unit_x
+                new_y = b[1] + unit_y
+
+                self.debugger(f"Free space output: {c_x_r}", "Propagation method", 1)
                 self.debugger(
-                    f"x [{b[0]} --> {c_x_r[0]}], y [{b[1]} --> {new_y}], theta [{rotation} --> {c_x_r[1]}]",
+                    f"x [{b[0]} --> {new_x}], y [{b[1]} --> {new_y}], theta [{rotation} --> {c_x_r[1]}]",
                     "Propagation method",
                     1,
                 )
@@ -186,6 +192,9 @@ class lab(Scene):
             if round(rotation, 3) == angle:
                 return True
 
+    def on_mouse_press(self, point, button, modifiers):
+        for func in self.mouse_press_callbacks:
+            func()
     def on_key_press(self, symbol, modifiers):
         """Manim uses this method for accepting input, by writing it here the method is overridden
 
@@ -198,6 +207,17 @@ class lab(Scene):
         except OverflowError:
             logger.warning("The value of the pressed key is too large.")
             return
+        try: 
+            mods = modifiers
+        except Exception as e:
+            print("Well that didn't work")
+            print(e)
+       
+        if mods !=0:
+            self.debugger(f"Modifier pressed: {mods}","key press")
+        else:
+            self.debugger(f"Character key pressed: {char}","key press")
+
         if char == "r":
             if self.labjects.rotation < 5.49:  # keep between 0 and 2pi
                 self.labjects.rotation += np.pi / 4
@@ -207,14 +227,7 @@ class lab(Scene):
         elif char == "q":
             self.quit_interaction = True
         elif char == "a":
-            print(" ")
-            element, player, create_bool = self.cursor_element(self.mouse_point)
-            if create_bool:
-                self.play(player)
-            else:
-                t = Text("Cannot place here")
-                self.play(FadeIn(t))
-                self.play(FadeOut(t))
+            self.interactive_add()
         elif char == "l":
             self.turn_on_laser()
         elif char == "s":
@@ -231,6 +244,11 @@ class lab(Scene):
             self.change_cursor(self.labjects.prism)
         elif char == "3":
             self.change_cursor(self.labjects.flat_mirror)
+        elif char == "w" and mods ==2:
+            print("Clearing all")
+            self.clear_everything()
+        
+        
 
     def change_cursor(self, new_element_method: classmethod):
         new_cursor, player, _ = new_element_method(
@@ -251,6 +269,24 @@ class lab(Scene):
         self.cursor = new_cursor
         self.wait(1)
         self.play(FadeOut(new_name))
+    
+    def interactive_add(self):
+        print(" ")
+        element, player, create_bool = self.cursor_element(self.mouse_point)
+        if create_bool:
+            self.play(player)
+        else:
+            t = Text("Cannot place here")
+            self.play(FadeIn(t))
+            self.play(FadeOut(t))
+    
+    def clear_everything(self):
+        fade_outs = []
+        for i, element in enumerate(self.labjects.elements):
+            fade_outs.append(FadeOut(element[0]))
+            del element
+        self.play(*fade_outs)
+        self.labjects.elements = []
 
     def debugger(self, debug_str: str, method_name: str = "", method_int=0):
 
