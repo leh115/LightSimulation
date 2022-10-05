@@ -15,12 +15,16 @@ class lab(Scene):
     def construct(self):
         """Manim uses a constuct method to generate a Scene"""
 
+        self.dots_out = []
+        self.dots_in = []
+        self.dot_toggle = True
         for x in range(-15, 16):
-            for y in range(-15, 16):
-                self.add(Dot(np.array([x, y, 0]), color=GREY))
-
-        self.add(
-            NumberPlane(
+           for y in range(-15, 16):
+                new_dot = Dot(np.array([x, y, 0]), color=GREY)
+                self.dots_out.append(FadeOut(new_dot))
+                self.dots_in.append(FadeIn(new_dot))
+                self.add(new_dot)
+        self.num_plane = NumberPlane(
                 x_range=(-15, 15),
                 y_range=(-15, 15),
                 background_line_style={
@@ -29,7 +33,8 @@ class lab(Scene):
                     "stroke_opacity": 0.3,
                 },
             ).set_stroke(opacity=0.1)
-        )
+        self.num_plane_toggle = True
+        self.add(self.num_plane)
         self.last_method_name = ""
         self.input_text = ""
         self.text_shift = False
@@ -70,7 +75,6 @@ class lab(Scene):
             self.play(FadeOut(t))
 
     def propagate_beam(self, start, rotation):
-        #b = start
         multiplier = 0.6
         b = np.add(
             start, [multiplier * np.cos(rotation), multiplier * np.sin(rotation), 0]
@@ -167,10 +171,14 @@ class lab(Scene):
     def on_mouse_press(self, point, button, modifiers):
         print(button)
         print(modifiers)
-        if button == 1:
+        if button == 1: # click left mouse
             for func in self.mouse_press_callbacks:
                 func()
-        elif button == 4:
+        elif button == 2: # click scroll
+            anim, i = self.labjects.remove_element(self.mouse_point)
+            self.play(anim)
+            self.labjects.elements.pop(i)
+        elif button == 4: # click right mouse
             self.turn_on_laser()
     
     def on_mouse_scroll(self, point, offset):
@@ -255,6 +263,20 @@ class lab(Scene):
         elif char == "=" and mods == 2:
             self.laser_steps += 1
             self.laser_distance()
+        elif char == "g" and mods == 2:
+            if self.num_plane_toggle:
+                self.play(FadeOut(self.num_plane))
+                self.num_plane_toggle = False
+            else:
+                self.play(FadeIn(self.num_plane))
+                self.num_plane_toggle = True
+        elif char == "d" and mods == 2:
+            if self.dot_toggle:
+                self.play(*self.dots_out, run_time=0.01)
+                self.dot_toggle = False
+            else:
+                self.play(*self.dots_in, run_time=0.01)
+                self.dot_toggle = True
         elif char == "-" and mods == 2:
             if self.laser_steps>1:
                 self.laser_steps -= 1
@@ -284,7 +306,7 @@ class lab(Scene):
         self.cursor = new_cursor
         self.wait(1)
         self.play(FadeOut(new_name))
-
+    
     def rotate_cursor(self, direction=1):
         self.labjects.rotation = (self.labjects.rotation + direction * np.pi / 4) % (2*np.pi)
         self.cursor.rotate(direction * np.pi / 4, np.array([0, 0, 1]))

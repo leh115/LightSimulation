@@ -197,15 +197,24 @@ class lab_objects:
         """
         return [round(loc.get_x()), round(loc.get_y()), round(loc.get_z())]
 
-    def element_here(self, loc):
-        for el in self.elements:
-            equal_positions = True
+    def element_here(self, loc, index_element =False):
+        for j, el in enumerate(self.elements):
             for i, el_loc in enumerate(np.array(self.round_loc(el[0]))):
                 if el_loc != loc[i]:
-                    equal_positions = False
-            if equal_positions:
+                    break
+            else:
+                if index_element:
+                    return True, el, j
                 return True, el
+        if index_element:
+            return False, None, -1
         return False, None
+
+    def remove_element(self, location):
+        element_bool, element, i = self.element_here(self.round_loc(location), index_element=True)
+        if element_bool:
+            
+            return FadeOut(element[0]), i
 
     #* Dunder
     def __iadd__(self,new_element):
