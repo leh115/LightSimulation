@@ -30,6 +30,8 @@ class lab(Scene):
             ).set_stroke(opacity=0.1)
         )
         self.last_method_name = ""
+        self.input_text = ""
+        self.text_shift = False
         self.debug = True
         self.labjects = lab_objects(self.mouse_point, self.debug)
         self.cursor_element = self.labjects.laser
@@ -42,8 +44,9 @@ class lab(Scene):
         self.labjects.elements = []
 
         self.rays = rays(self.debug)
-        
+        self.laser_steps = 5
         self.mouse_press_callbacks = [self.interactive_add]
+        self.on_key_press = self.key_press
         
 
     def turn_on_laser(self):
@@ -64,7 +67,8 @@ class lab(Scene):
             self.wait()
             self.play(FadeOut(t))
 
-    def propagate_beam(self, start, rotation, steps=20):
+    def propagate_beam(self, start, rotation):
+        steps = self.laser_steps
         multiplier = 0.6
         a = np.add(
             start, [multiplier * np.cos(rotation), multiplier * np.sin(rotation), 0]
@@ -91,14 +95,13 @@ class lab(Scene):
                     ],
                 )
             )
-        beam = Line(start=a, end=b, color=RED)
-        self.play(ShowCreation(beam))
+        self.make_beam(a,b,1)
         element_interaction = None
         el_location = [0, 0]
         rad_angle = 0
         for i in range(steps):
             el_bool, el = self.labjects.element_here(b)
-            if el_bool:
+            if el_bool and el[0].__name__!="Beam":
                 rad_angle = rotation - el[1]
                 rad_angle = np.abs(rad_angle)
                 self.debugger(
@@ -117,6 +120,10 @@ class lab(Scene):
                 unit_x = c_x_r[0] - b[0]
                 unit_y = np.sin( np.arcsin(c_x_r[1]) + np.sign(-(rotation - np.pi + 1e-4))*np.pi/2)
                 
+                if unit_x!=0:
+                    unit_y /= np.abs(unit_x)
+                    unit_x /= np.abs(unit_x)
+
                 new_x = b[0] + unit_x
                 new_y = b[1] + unit_y
 
@@ -127,8 +134,7 @@ class lab(Scene):
                     1,
                 )
                 c = [new_x, new_y, 0]
-                beam = Line(start=b, end=c, color=RED)
-                self.play(ShowCreation(beam), run_time=1 / (i + 1))
+                self.make_beam(b,c,i)
                 b = c
 
         beam_x_mat, beam_y_mat = self.rays.loc_rot_2_mats(
@@ -146,8 +152,6 @@ class lab(Scene):
             self.debugger(x_rot[1] * np.pi, "Propagation method", 1)
             self.debugger(y_rot[1] * np.pi, "Propagation method", 1)
             c = np.round(np.add(b, [x_rot[1], y_rot[1], 0]))
-            beam = Line(start=b, end=c, color=RED)
-            self.play(ShowCreation(beam), run_time=1 / (i + 1))
 
         elif element_interaction == "Thin Lens":
             self.debugger(f"Calculating thin lens interaction", "Propagation method", 1)
@@ -164,14 +168,19 @@ class lab(Scene):
                 new_x = el_location[0] - np.abs(x_thin_lens[0] - el_location[0])
             new_y = el_location[1] + (x_thin_lens[0] - el_location[0]) * np.sin(
                 x_thin_lens[1]
-            )  #% np.pi)
+            ) 
             self.debugger(f"New x: {new_x}, New y: {new_y}", "Propagation method", 1)
             # [x_1, theta_1] = M[x_0, theta_0]
             # y_1 = y_0 + (x_1 - x_0)*theta_1
             print(x_thin_lens)
             c = [new_x, new_y, 0]
-            beam = Line(start=b, end=c, color=RED)
-            self.play(ShowCreation(beam), run_time=1 / (i + 1))
+        self.make_beam(b, c, i)
+
+    def make_beam(self, b, c, i):
+        beam = Line(start=b, end=c, color=RED)
+        beam.__name__ = "Beam"
+        self.labjects += [beam,0]
+        self.play(ShowCreation(beam), run_time= 0.5 / (i + 1))
 
     #! this is outdated and needs to work for all angles
     def test_angled(self, rotation):
@@ -195,7 +204,33 @@ class lab(Scene):
     def on_mouse_press(self, point, button, modifiers):
         for func in self.mouse_press_callbacks:
             func()
-    def on_key_press(self, symbol, modifiers):
+    def type_input(self, symbol, modifiers):
+        try:
+            char = chr(symbol)
+        except Exception as e:
+            print(e)
+        if char == "（":
+            self.input_text = self.input_text[:-1]
+            print(self.input_text)
+            return
+        elif char == "－":
+            self.on_key_press = self.key_press
+            t = Text(self.input_text).move_to(TOP).shift(DOWN)
+            self.play(FadeIn(t))
+            self.play(FadeOut(t))
+            self.input_text = ""
+            return
+        elif char == "￡" or char == "￢":
+            self.text_shift = True
+            return
+        if self.text_shift:
+            self.input_text += char.upper()
+            self.text_shift = False
+        else:
+            self.input_text += char
+        print(self.input_text)
+
+    def key_press(self, symbol, modifiers):
         """Manim uses this method for accepting input, by writing it here the method is overridden
 
         Args:
@@ -210,7 +245,6 @@ class lab(Scene):
         try: 
             mods = modifiers
         except Exception as e:
-            print("Well that didn't work")
             print(e)
        
         if mods !=0:
@@ -244,9 +278,18 @@ class lab(Scene):
             self.change_cursor(self.labjects.prism)
         elif char == "3":
             self.change_cursor(self.labjects.flat_mirror)
-        elif char == "w" and mods ==2:
-            print("Clearing all")
+        elif char == "w" and mods == 2:
             self.clear_everything()
+        elif char == "=" and mods == 2:
+            self.laser_steps += 1
+            self.laser_distance()
+        elif char == "-" and mods == 2:
+            if self.laser_steps>1:
+                self.laser_steps -= 1
+                self.laser_distance()
+        elif char == "t" and mods == 1:
+            self.override_keyboard()
+            print("- ------ - Text Mode - ------ -")
         
         
 
@@ -279,14 +322,21 @@ class lab(Scene):
             t = Text("Cannot place here")
             self.play(FadeIn(t))
             self.play(FadeOut(t))
-    
+    def laser_distance(self):
+        t = Text("Laser distance: " + str(self.laser_steps)).move_to(TOP).shift(DOWN)
+        self.play(FadeIn(t))
+        self.play(FadeOut(t))
     def clear_everything(self):
+        print("Clearing all")
         fade_outs = []
         for i, element in enumerate(self.labjects.elements):
             fade_outs.append(FadeOut(element[0]))
             del element
         self.play(*fade_outs)
         self.labjects.elements = []
+
+    def override_keyboard(self):
+        self.on_key_press = self.type_input
 
     def debugger(self, debug_str: str, method_name: str = "", method_int=0):
 

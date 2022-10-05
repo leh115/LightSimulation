@@ -158,18 +158,19 @@ class lab_objects:
         # check if element is already in this position
         loc_available = True
         for el in self.elements:
-            self.debugger(
-                f"Placed element's location: {self.round_loc(el[0])}",
-                "snap position method",
-                2,
-            )
-            self.debugger(
-                f"Desired element's location: {self.round_loc(pos)}",
-                "snap position method",
-                2,
-            )
+            
             if self.round_loc(el[0]) == self.round_loc(pos):
-                self.debugger("Location not available", "snap position method", 2)
+                self.debugger(
+                f"Placed element ({el[0].__name__}) location: {self.round_loc(el[0])}",
+                "snap position method",
+                2,
+                )
+                self.debugger(
+                    f"Desired element ({element.__name__}) location: {self.round_loc(pos)}",
+                    "snap position method",
+                    2,
+                )
+                self.debugger(f"Location taken by {el[0].__name__}", "snap position method", 2)
                 loc_available = False
                 del element
                 return False
@@ -206,9 +207,24 @@ class lab_objects:
                 return True, el
         return False, None
 
+    #* Dunder
+    def __iadd__(self,new_element):
+        self.elements.append(new_element)
+        return self
+    
+    def __repr__(self) -> str:
+        numjects = len(self.elements)
+        s = ""
+        if numjects>1:
+            s = "s"
+        return f"Labjects object with {numjects} element{s}"
+
+    #* Other functions
     def debugger(self, debug_str: str, method_name: str = "", method_int=0):
         if self.debug:
             if self.last_method_name is not method_name:
                 print("")
             print(str(" " * method_int * 4) + "~" + method_name + " ... " + str(debug_str))
             self.last_method_name = method_name
+
+    
